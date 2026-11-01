@@ -9,7 +9,7 @@ MIMESIS only ships for Windows, so Steam runs it with Proton. The patches are Me
 2. Start MIMESIS once from Steam and quit it (this creates the game's Proton prefix).
 3. In a terminal (Steam Deck: Desktop Mode > Konsole):
    ```sh
-   git clone https://github.com/medovanx/mimesis-patches
+   git clone -b linux https://github.com/oliveira-sh/mimesis-patches
    cd mimesis-patches
    python3 linux/mimesis-patches.py install
    ```

@@ -1,5 +1,7 @@
 # MIMESIS Patches
 
+> Fork of [medovanx/mimesis-patches](https://github.com/medovanx/mimesis-patches) with Linux (Steam / Proton) support and ports to MIMESIS EA 0.4.0.
+
 Patches for MIMESIS (released builds: EA 0.3.1; the code here is ported to EA 0.4.0, see [Game version](#game-version)). Each patch is a [MelonLoader](https://github.com/LavaGang/MelonLoader) mod, your game files are never modified, and you can combine any of them.
 
 ![Main menu with the Patches chip bottom-left, and the Patches window open](screenshots/menu.png)
@@ -35,10 +37,8 @@ To install by hand instead: install [MelonLoader](https://github.com/LavaGang/Me
 ## Linux (Steam / Proton)
 MIMESIS only ships for Windows, so on Linux and Steam Deck Steam runs it with Proton. The patches work there too: install them with [`linux/mimesis-patches.py`](linux/) instead of the Windows installer. It needs Python 3.8+ and, to build the patches for the current game, the **.NET SDK 8** or newer ([how to install it](linux/README.md#building)):
 
-> The Linux support and the EA 0.4.0 ports live on the `linux` branch of [oliveira-sh/mimesis-patches](https://github.com/oliveira-sh/mimesis-patches/tree/linux) until they're merged into [medovanx/mimesis-patches](https://github.com/medovanx/mimesis-patches).
-
 ```sh
-git clone -b linux https://github.com/oliveira-sh/mimesis-patches
+git clone https://github.com/oliveira-sh/mimesis-patches
 cd mimesis-patches
 python3 linux/mimesis-patches.py install      # all patches; or e.g. install Fov Minimap
 ```

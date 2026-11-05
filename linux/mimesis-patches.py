@@ -78,6 +78,7 @@ PATCHES = [
     Patch("Fov", "Field of view slider", "Anyone"),
     Patch("Revive", "Revive dead teammates", "Host"),
     Patch("FpsCounter", "FPS in the bottom-right corner", "Anyone"),
+    Patch("MimicControl", "Dead players control mimics", "Host + possessor"),
 ]
 BY_NAME = {p.name: p for p in PATCHES}
 
@@ -1528,7 +1529,7 @@ def print_override_tip():
 
 def cmd_list(args):
     repo = args.repo_dir if is_repo(args.repo_dir) else None
-    say("%-13s %-9s %-9s %s" % ("Patch", "Version", "Needs it", "What it does"))
+    say("%-13s %-9s %-16s %s" % ("Patch", "Version", "Needs it", "What it does"))
     for p in PATCHES:
         version = "-"
         if repo is not None:
@@ -1538,9 +1539,10 @@ def cmd_list(args):
                 version = m.group(1) if m else "-"
             except (StopIteration, OSError):
                 pass
-        say("%-13s %-9s %-9s %s" % (p.name, version, p.who, p.about))
+        say("%-13s %-9s %-16s %s" % (p.name, version, p.who, p.about))
     say()
-    say("Needs it: Host = only the host needs it; Everyone = host and every player; Anyone = personal feature.")
+    say("Needs it: Host = only the host needs it; Everyone = host and every player; Anyone = personal feature;")
+    say("          Host + possessor = the host and each player who wants to control a mimic.")
     if repo is not None:
         say("Version: the version in this checkout (%s)." % repo)
     return 0

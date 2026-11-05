@@ -142,10 +142,23 @@ def fpscounter(d, cx, cy):
     d.text((cx, cy + 180), "FPS", font=font("seguibl.ttf", 150), fill=WHITE, anchor="mm")
 
 
+def mimiccontrol(d, cx, cy):
+    # A marionette: gold control bar, strings down to a figure with a mimic's red eyes.
+    d.line([(cx - 200, cy - 200), (cx + 200, cy - 200)], fill=GOLD, width=36)
+    d.line([(cx, cy - 250), (cx, cy - 130)], fill=GOLD, width=36)
+    for x0, y0, x1, y1 in [(-190, -200, -150, 40), (190, -200, 150, 40), (0, -130, 0, -40)]:
+        d.line([(cx + x0, cy + y0), (cx + x1, cy + y1)], fill=DIM, width=9)
+    d.line([(cx - 150, cy + 40), (cx - 62, cy + 175)], fill=WHITE, width=34, joint="curve")    # arms up to the strings
+    d.line([(cx + 150, cy + 40), (cx + 62, cy + 175)], fill=WHITE, width=34, joint="curve")
+    person(d, cx, cy + 150, 210, WHITE)
+    for ex in (-20, 20):
+        d.ellipse([cx + ex - 11, cy + 56, cx + ex + 11, cy + 76], fill=(220, 60, 50))
+
+
 SYMBOLS = {
     "BiggerLobby": biggerlobby, "PSController": pscontroller, "SpectatorCam": spectatorcam, "Minimap": minimap,
     "HostOptions": hostoptions, "HudPercent": hudpercent, "Inventory": inventory, "LateJoin": latejoin,
-    "Fov": fov, "Revive": revive, "FpsCounter": fpscounter,
+    "Fov": fov, "Revive": revive, "FpsCounter": fpscounter, "MimicControl": mimiccontrol,
 }
 
 

@@ -45,6 +45,7 @@ namespace MimesisInstaller
             new("Fov", "Field of view slider", "Anyone"),
             new("Revive", "Revive dead teammates", "Host"),
             new("FpsCounter", "FPS in the bottom-right corner", "Anyone"),
+            new("MimicControl", "Dead players control mimics", "Host + possessor"),
         };
 
         // Long timeout: patch files and the installer itself can be slow to download on some connections.

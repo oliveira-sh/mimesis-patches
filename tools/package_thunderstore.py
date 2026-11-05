@@ -23,6 +23,7 @@ DESCRIPTIONS = {
     "Fov": "Field of view slider (50-120). Tap or hold [ and ] in game to change it on the fly.",
     "Revive": "Stand next to a dead teammate for a few seconds to revive them. Host only.",
     "FpsCounter": "Shows your frame rate in the bottom-right corner (FPS: 144).",
+    "MimicControl": "Dead players take full control of a possessed mimic: walk, run, look and grab living players until it dies. Host rules for cooldown and strength. Host and possessing player need it.",
 }
 
 

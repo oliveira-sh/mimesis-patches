@@ -51,6 +51,14 @@ namespace SpectatorCam
                 if (_free) Exit(cam, null);
                 return true;
             }
+            // The MimicControl patch is driving a mimic with these same keys (WASD, Shift): no free camera until it lets go.
+            // It's a separate DLL, so it says so through AppDomain data. (Returning false from its own prefix couldn't
+            // stop this one: Harmony runs every prefix.)
+            if (MimicControlActive())
+            {
+                if (_free) Exit(cam, target);
+                return true;
+            }
             if (Hub.s.uiman != null && Hub.s.uiman.isGameMenuOpen) return !_free;
             // The game also ignores spectator input while its F9 feedback form (text fields) is open.
             if (Hub.s.feedbackMan != null && Hub.s.feedbackMan.feedbackUI != null && Hub.s.feedbackMan.feedbackUI.IsOpen) return !_free;
@@ -86,6 +94,9 @@ namespace SpectatorCam
         {
             if (_free) Exit(__instance.spectatorCamera, null);
         }
+
+        /// <summary>MimicControl's flag (its Const.ActiveFlagKey): true while this game controls a mimic.</summary>
+        static bool MimicControlActive() => System.AppDomain.CurrentDomain.GetData("medovanx.mimiccontrol.active") is bool on && on;
 
         static void Enter(CinemachineCamera cam)
         {

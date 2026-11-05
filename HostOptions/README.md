@@ -6,7 +6,7 @@
 
 Extra lobby options for the host: **infinite stamina**, **starting money**, and **difficulty and economy** settings.
 
-![Infinite Stamina and Starting money in the lobby menu, on EA 0.3.1 (on EA 0.4.0 they're in TRAM Settings)](screenshots/options.png)
+![Infinite Stamina and Starting money in the lobby menu, on EA 0.3.1 (since EA 0.4.0 they're in TRAM Settings)](screenshots/options.png)
 
 **Only the host needs it.** Other players don't see the controls.
 

@@ -1,13 +1,13 @@
 # MIMESIS Patches
 
-> Fork of [medovanx/mimesis-patches](https://github.com/medovanx/mimesis-patches) with Linux (Steam / Proton) support and ports to MIMESIS EA 0.4.0.
+> Fork of [medovanx/mimesis-patches](https://github.com/medovanx/mimesis-patches) with Linux (Steam / Proton) support and ports to MIMESIS EA 0.4.1.
 
-Patches for MIMESIS (released builds: EA 0.3.1; the code here is ported to EA 0.4.0, see [Game version](#game-version)). Each patch is a [MelonLoader](https://github.com/LavaGang/MelonLoader) mod, your game files are never modified, and you can combine any of them.
+Patches for MIMESIS (released builds: EA 0.3.1; the code here targets EA 0.4.1, see [Game version](#game-version)). Each patch is a [MelonLoader](https://github.com/LavaGang/MelonLoader) mod, your game files are never modified, and you can combine any of them.
 
 ![Main menu with the Patches chip bottom-left, and the Patches window open](screenshots/menu.png)
 
 ## Game version
-The code in this repo is ported to **EA 0.4.0** (Steam build 26212298), the current game. The [releases](https://github.com/medovanx/mimesis-patches/releases), which the installer, Thunderstore and the Linux tool's `--source github` install, are still the **EA 0.3.1** builds, and on EA 0.4.0 several of them don't work:
+The code in this repo targets **EA 0.4.1** (Steam build 26447295), the current game. It was ported to EA 0.4.0, and EA 0.4.1 needed no further changes: every patch builds against it and its hooks still match. The [releases](https://github.com/medovanx/mimesis-patches/releases), which the installer, Thunderstore and the Linux tool's `--source github` install, are still the **EA 0.3.1** builds, and on EA 0.4.0 and later several of them don't work:
 - No release shows the **Patches** chip on the main menu (the game renamed the text it looks for), so no patch's options can be changed in game.
 - **BiggerLobby 1.5.7**: lobbies still hold 10, but its result screen patch no longer fits the game and stops the rest from loading: no difficulty scaling and no 10-player spectator list. Its player list is for the old pause menu, which the game no longer opens.
 - **HostOptions 1.4.4**: Infinite Stamina and Starting money never show in the lobby (they were in the old Esc menu).
@@ -15,14 +15,14 @@ The code in this repo is ported to **EA 0.4.0** (Steam build 26212298), the curr
 - **LateJoin 1.2.3**: does nothing (the game now handles mid-run joins itself).
 - **HudPercent 1.3.4** and **PSController 1.5.4**: made for the old HUD bars and controller prompts, which EA 0.4.0 replaced.
 
-Fov, FpsCounter, Minimap, Revive and SpectatorCam still work, apart from the chip and the fixes listed below. Until there are releases for EA 0.4.0, use builds of this code: build them yourself (see [Build](#build); on Linux the [Linux tool](#linux-steam--proton) does it for you), or get them from a friend who did (see [Playing with friends](#playing-with-friends)). Changes for 0.4.0 are in each patch's CHANGELOG under *Unreleased*:
+Fov, FpsCounter, Minimap, Revive and SpectatorCam still work, apart from the chip and the fixes listed below. Until there are releases for EA 0.4, use builds of this code: build them yourself (see [Build](#build); on Linux the [Linux tool](#linux-steam--proton) does it for you), or get them from a friend who did (see [Playing with friends](#playing-with-friends)). Changes for 0.4.0 are in each patch's CHANGELOG under *Unreleased*:
 - **Ported to the game's new UI and systems**: BiggerLobby (pause menu, result screens, spectator list, room lists), HostOptions (moved to the TRAM Settings window), HudPercent (new health graph and radiation gauge), Inventory (new inventory with bag slots), LateJoin (the game now does mid-run joins itself), PSController (new controller prompts), and the Patches chip on the new main menu (all patches).
 - **Fixed for new game features**: Fov ([ and ] while typing in TRAM Settings), SpectatorCam (mimic possession and the F9 form).
 - **Also fixed**: Revive no longer revives anyone once the level is decided (an older bug).
 - **Checked, no changes needed**: Minimap and FpsCounter (apart from the shared Patches window changes).
 
 ## Install
-On EA 0.4.0, read [Game version](#game-version) first: the installer installs the EA 0.3.1 builds.
+On EA 0.4.0 or later, read [Game version](#game-version) first: the installer installs the EA 0.3.1 builds.
 
 1. Download **`MimesisPatchesInstaller.exe`** from the [Releases page](https://github.com/medovanx/mimesis-patches/releases).
 2. Run it, tick the patches you want and click **Install / update selected**. It installs MelonLoader for you if you don't have it, and moves older installs over automatically. See [Installer](Installer/).
@@ -62,11 +62,12 @@ In game, the Patches window still shows when an update is available. Under Proto
 | [Revive](Revive/) | 1.2.3 | Yes | No | Stand next to a dead teammate to revive them |
 | [HudPercent](HudPercent/) | 1.3.4 | Optional | Optional | Health and radiation percentages next to the HUD bars |
 | [FpsCounter](FpsCounter/) | 1.1.4 | Optional | Optional | Frame rate in the bottom-right corner |
+| [MimicControl](MimicControl/) | 1.0.0 | Yes | To control a mimic | Dead players take full control of a possessed mimic: walk, run and grab living players until it dies |
 
 **Host / Player**: who needs the patch. *Yes* = required, *No* = not needed, *Optional* = personal feature, install it if you want it.
 
 ## Playing with friends
-Friends who join need the patches with *Yes* in the Player column (BiggerLobby too for the 10-player UI), and on EA 0.4.0 they need builds of this code, like the host, not the releases (see [Game version](#game-version)). The releases have the same version numbers, so the Patches window can't tell them apart: check where everyone got theirs.
+Friends who join need the patches with *Yes* in the Player column (BiggerLobby too for the 10-player UI), and on EA 0.4.0 or later they need builds of this code, like the host, not the releases (see [Game version](#game-version)). The releases have the same version numbers, so the Patches window can't tell them apart: check where everyone got theirs.
 
 A build is one file per patch, `<Patch>Runtime.dll`, and the same file works on Windows and Linux. To get them:
 - **Build them**: on Windows, see [Build](#build) (each DLL ends up in `<Patch>/Runtime/bin/Release/net472/`). On Linux, `python3 linux/mimesis-patches.py install` builds and installs them.
@@ -75,7 +76,7 @@ A build is one file per patch, `<Patch>Runtime.dll`, and the same file works on 
 On Windows, don't click the installer's **Install / update selected** while you use these builds: it puts the EA 0.3.1 release builds back.
 
 ## Screenshots
-Taken on EA 0.3.1, so some screens look different on EA 0.4.0: HostOptions' controls are in the lobby's TRAM Settings window (F1), Inventory's slots 5-8 are the game's bag row, and the menus are new.
+Taken on EA 0.3.1, so some screens look different since EA 0.4.0: HostOptions' controls are in the lobby's TRAM Settings window (F1), Inventory's slots 5-8 are the game's bag row, and the menus are new.
 
 <table>
 <tr><td align="center"><a href="BiggerLobby/"><img src="BiggerLobby/screenshots/lobby.png" width="260"><br>BiggerLobby</a></td><td align="center"><a href="PSController/"><img src="PSController/screenshots/prompts.png" width="260"><br>PSController</a></td><td align="center"><a href="Minimap/"><img src="Minimap/screenshots/graphic.png" width="260"><br>Minimap</a></td></tr>

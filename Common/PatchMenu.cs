@@ -552,7 +552,7 @@ namespace MimesisPatches
 
             // Author footer along the bottom; clicking it opens the repo.
             var footer = PatchUi.Label(panel, _font,
-                "Made by <b>Mohamed Darwesh</b> (@medovanx)   |   <u>github.com/medovanx/mimesis-patches</u>", 18f, PatchUi.Dim);
+                $"Made by <b>Mohamed Darwesh</b> (@medovanx)   |   <u>github.com/{Repo}</u>", 18f, PatchUi.Dim);
             Destroy(footer.GetComponent<LayoutElement>());
             footer.alignment = TextAlignmentOptions.Center;
             footer.raycastTarget = true;
@@ -565,18 +565,22 @@ namespace MimesisPatches
             footer.gameObject.AddComponent<Button>().onClick.AddListener(() => Application.OpenURL(RepoUrl));
             Hover(footer.gameObject);
 
-            // Left sidebar.
-            _sidebar = PatchUi.Box(panel, "Sidebar", new Color(1f, 1f, 1f, 0.04f));
-            _sidebar.anchorMin = new Vector2(0f, 0f);
-            _sidebar.anchorMax = new Vector2(0f, 1f);
-            _sidebar.pivot = new Vector2(0f, 0.5f);
-            _sidebar.offsetMin = new Vector2(16f, 56f);
-            _sidebar.offsetMax = new Vector2(296f, -80f);
+            // Left sidebar: one button per patch, scrolling when they don't all fit (many patches, or a small window)
+            // instead of squeezing the buttons.
+            var sideBox = PatchUi.Box(panel, "Sidebar", new Color(1f, 1f, 1f, 0.04f));
+            sideBox.anchorMin = new Vector2(0f, 0f);
+            sideBox.anchorMax = new Vector2(0f, 1f);
+            sideBox.pivot = new Vector2(0f, 0.5f);
+            sideBox.offsetMin = new Vector2(16f, 56f);
+            sideBox.offsetMax = new Vector2(296f, -80f);
+            _sidebar = ScrollArea(sideBox);
+            PatchUi.Stretch((RectTransform)_sidebar.parent.parent);   // the scroll area fills the box
             var sideLayout = _sidebar.gameObject.AddComponent<VerticalLayoutGroup>();
-            sideLayout.padding = new RectOffset(8, 8, 8, 8);
+            sideLayout.padding = new RectOffset(8, 12, 8, 8);
             sideLayout.spacing = 6f;
             sideLayout.childControlWidth = sideLayout.childControlHeight = true;
             sideLayout.childForceExpandHeight = false;
+            _sidebar.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Right content.
             _content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -595,7 +599,9 @@ namespace MimesisPatches
 
         void BuildSidebar()
         {
-            foreach (Transform c in _sidebar) Destroy(c.gameObject);
+            // Hidden at once (Destroy only happens at the end of the frame), so the layout below sees the new list only.
+            foreach (Transform c in _sidebar) { c.gameObject.SetActive(false); Destroy(c.gameObject); }
+            int index = 0, selectedIndex = -1;
             foreach (var e in Entries)
             {
                 var name = (string)e["name"];
@@ -605,7 +611,26 @@ namespace MimesisPatches
                 text.alignment = TextAlignmentOptions.MidlineLeft;
                 text.margin = new Vector4(14f, 0f, 8f, 0f);
                 b.GetComponent<Image>().color = name == _selected ? PatchUi.On : PatchUi.Off;
+                if (name == _selected) selectedIndex = index;
+                index++;
             }
+            ScrollSidebarTo(selectedIndex);
+        }
+
+        // Scrolls the sidebar just enough to show the button at this index (48 px buttons, 6 px apart, 8 px padding).
+        void ScrollSidebarTo(int index)
+        {
+            var scroll = _sidebar != null ? _sidebar.GetComponentInParent<ScrollRect>() : null;
+            if (scroll == null || index < 0) return;
+            Canvas.ForceUpdateCanvases();
+            float list = _sidebar.rect.height, view = scroll.viewport.rect.height, room = list - view;
+            if (room <= 0f) return;
+            float top = 8f + index * 54f, bottom = top + 48f;
+            float offset = (1f - scroll.verticalNormalizedPosition) * room;   // how far down the list the view starts
+            if (top < offset) offset = top - 8f;
+            else if (bottom > offset + view) offset = bottom + 8f - view;
+            else return;
+            scroll.verticalNormalizedPosition = 1f - Mathf.Clamp(offset, 0f, room) / room;
         }
 
         void Select(string name)

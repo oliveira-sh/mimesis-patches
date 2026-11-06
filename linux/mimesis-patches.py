@@ -32,7 +32,7 @@ from pathlib import Path
 
 TOOL_VERSION = "1.0.0"
 APP_ID = "2827200"
-DEFAULT_REPO = "medovanx/mimesis-patches"
+DEFAULT_REPO = "oliveira-sh/mimesis-patches"
 USER_AGENT = "mimesis-patches-linux-installer"
 
 # MelonLoader, the mod loader the patches run in (the one MIMESIS mods on Thunderstore use). The game is a Windows

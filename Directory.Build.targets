@@ -21,7 +21,7 @@
       <_Parameter2>$(PatchName)</_Parameter2>
       <_Parameter3>$(Version)</_Parameter3>
       <_Parameter4>medovanx</_Parameter4>
-      <_Parameter5>https://github.com/medovanx/mimesis-patches</_Parameter5>
+      <_Parameter5>https://github.com/oliveira-sh/mimesis-patches</_Parameter5>
     </AssemblyAttribute>
     <AssemblyAttribute Include="MelonLoader.MelonGameAttribute">
       <_Parameter1>ReLUGames</_Parameter1>

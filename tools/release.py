@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from package_thunderstore import package, DESCRIPTIONS   # noqa: E402
 
-REPO = "medovanx/mimesis-patches"
+REPO = "oliveira-sh/mimesis-patches"   # where GitHub releases go (the installer and in-game updater read them)
 TEAM = "medovanx"
 COMMUNITY = "mimesis"
 CATEGORIES = ["mods"]
@@ -156,7 +156,8 @@ def main():
 
     for p, v, entry, dll, zip_path in done:
         notes = entry.split("\n", 1)[1] + f"\nInstall: **MimesisPatchesInstaller.exe** or the in-game Patches window, or from Thunderstore with Gale / r2modman. Full history: [CHANGELOG](https://github.com/{REPO}/blob/main/{p}/CHANGELOG.md)"
-        run("gh", "release", "create", f"{p}-v{v}", str(dll), str(zip_path), "-t", f"{p} {v}", "--latest=false", "-n", notes)
+        # -R: never let gh pick a remote on its own (a fork has the upstream as a second remote).
+        run("gh", "release", "create", "-R", REPO, f"{p}-v{v}", str(dll), str(zip_path), "-t", f"{p} {v}", "--latest=false", "-n", notes)
         if ts and p in THUNDERSTORE:
             status, reply = upload_thunderstore(zip_path, token)
             print(f"  Thunderstore: {'uploaded' if status < 300 else f'FAILED ({status}) {reply}'}")

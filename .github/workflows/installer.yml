@@ -1,0 +1,53 @@
+# Builds MimesisPatchesInstaller.exe on Windows and publishes it as the "Installer-vX.Y.Z" GitHub release
+# (the version comes from Installer/Installer.csproj). Runs when the installer changes on main, or by hand.
+# The patch DLLs are not built here: they compile against the game's own assemblies, so they are released
+# from a machine with the game installed (tools/release.py).
+name: Installer
+
+on:
+  push:
+    branches: [main]
+    paths: ["Installer/**", ".github/workflows/installer.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$p = Get-Content Installer/Installer.csproj
+          $v = ($p.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Publish
+        run: dotnet publish Installer/Installer.csproj -c Release -o out
+
+      - name: Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $tag = "Installer-v$env:VERSION"
+          $exe = "out/MimesisPatchesInstaller.exe"
+          gh release view $tag -R $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # Same version again (e.g. a docs-only change): replace the exe in the existing release.
+            gh release upload $tag $exe --clobber -R $env:GITHUB_REPOSITORY
+          } else {
+            $notes = "One-click installer for the MIMESIS patches: download MimesisPatchesInstaller.exe, run it, tick the patches and click Install / update selected. It installs MelonLoader if needed. Changes: [CHANGELOG](https://github.com/$env:GITHUB_REPOSITORY/blob/main/Installer/CHANGELOG.md)"
+            gh release create $tag $exe -t "Installer $env:VERSION" -n $notes --latest -R $env:GITHUB_REPOSITORY
+          }
+          exit $LASTEXITCODE

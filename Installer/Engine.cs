@@ -24,7 +24,7 @@ namespace MimesisInstaller
 
     static class Engine
     {
-        public const string Repo = "medovanx/mimesis-patches";
+        public const string Repo = "oliveira-sh/mimesis-patches";   // fork: releases built for the current game
         public static readonly string Version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 
         // MelonLoader, the mod loader the patches run in (the one MIMESIS mods on Thunderstore use).
@@ -175,6 +175,7 @@ namespace MimesisInstaller
             EnsureMelonLoader(dll);
             var mods = ModsDir(dll);
             Directory.CreateDirectory(mods);
+            RemoveRetired(dll);
             for (int i = 0; i < list.Count; i++)
             {
                 var p = list[i];
@@ -188,10 +189,28 @@ namespace MimesisInstaller
             progress?.Invoke(list.Count, list.Count);
         }
 
+        // Patches that were replaced: their DLL is deleted on install and uninstall so the old code stops loading.
+        static readonly Dictionary<string, string> Retired = new Dictionary<string, string>
+        {
+            ["MimicControl"] = "replaced by Hallucinations",
+        };
+
+        static void RemoveRetired(string dll)
+        {
+            foreach (var r in Retired)
+            {
+                var path = Path.Combine(ModsDir(dll), r.Key + "Runtime.dll");
+                if (!File.Exists(path)) continue;
+                File.Delete(path);
+                Console.WriteLine($"== {r.Key}: removed ({r.Value})\n");
+            }
+        }
+
         /// <summary>Removes the given patches. MelonLoader stays (other mods may use it).</summary>
         public static void Uninstall(string dll, IEnumerable<PatchInfo> remove, Dictionary<string, Release> releases, Action<int, int> progress = null)
         {
             Log.CloseGame();
+            RemoveRetired(dll);
             var removing = remove.ToList();
             var kept = Migrate(dll).Except(removing).ToList();   // older installs that stay: reinstall them as mods
             foreach (var p in removing)

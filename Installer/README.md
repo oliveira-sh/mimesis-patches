@@ -1,13 +1,13 @@
 # MIMESIS Patches Installer
 
-**Version 5.1.0**
+**Version 5.2.0**
 
 Install, update or remove **every patch** from one exe.
 
 ![Installer window with the patch cards (one Installed, one Download)](screenshots/installer.png)
 
 ## Use
-1. Download `MimesisPatchesInstaller.exe` from the [Releases page](https://github.com/medovanx/mimesis-patches/releases) and run it from anywhere. It finds your game automatically; if not, click **Change game folder**.
+1. Download `MimesisPatchesInstaller.exe` from the [Releases page](https://github.com/oliveira-sh/mimesis-patches/releases) and run it from anywhere. It finds your game automatically; if not, click **Change game folder**.
 2. Tick the patches you want and click **Install / update selected**. If MelonLoader isn't in your game folder, the installer adds it (0.7.3) first. Patches go into the game's `Mods` folder.
 3. To remove patches, click **Uninstall selected** (ticked ones only) or **Uninstall all**. MelonLoader stays installed.
 

@@ -31,7 +31,7 @@ namespace MimesisPatches
 {
     sealed class PatchMenu : MonoBehaviour
     {
-        public const string Repo = "medovanx/mimesis-patches";
+        public const string Repo = "oliveira-sh/mimesis-patches";   // fork: releases built for the current game
         public const string RepoUrl = "https://github.com/" + Repo;
         const string SizeKey = "medovanx.patches.window";
         static readonly Vector2 MinSize = new Vector2(900f, 560f);

@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>5.1.0</Version>
-    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><Nullable>disable</Nullable>
+    <Version>5.2.0</Version>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><Nullable>disable</Nullable>
     <AssemblyName>MimesisPatchesInstaller</AssemblyName><RootNamespace>MimesisInstaller</RootNamespace><ApplicationIcon>icon.ico</ApplicationIcon>
     <Authors>Mohamed Darwesh</Authors><Company>Mohamed Darwesh</Company><Product>MIMESIS Patches Installer</Product><Copyright>Mohamed Darwesh (github.com/medovanx)</Copyright>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier><SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <!-- Windows Forms can't be trimmed, so the whole framework is bundled (bigger exe, nothing to install). -->
+    <!-- .NET 8 and EnableWindowsTargeting: the exe also builds on Linux (dotnet publish -c Release) with the same SDK as the patches. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 </Project>

@@ -11,7 +11,7 @@ The host sets the inventory size to **1-8 slots**. Slots 5-8 are the game's own 
 **Every player needs it.** The host's game decides the slots and everyone sees slots 5-8, but below 4 a player without it still sees the locked slots (they stay empty), so make sure everyone installs it.
 
 ## Install
-Use the [installer](../Installer/), or install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder, run the game once, then copy `InventoryRuntime.dll` from this patch's [release](https://github.com/medovanx/mimesis-patches/releases) into the game's `Mods` folder.
+Use the [installer](../Installer/), or install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder, run the game once, then copy `InventoryRuntime.dll` from this patch's [release](https://github.com/oliveira-sh/mimesis-patches/releases) into the game's `Mods` folder.
 
 ## Options
 

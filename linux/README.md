@@ -96,7 +96,7 @@ After every install, `<game>/UserData/mimesis-patches-linux.json` says how the p
   "script": "/home/me/mimesis-patches/linux/mimesis-patches.py",
   "repo_dir": "/home/me/mimesis-patches",
   "source": "local",
-  "repo": "medovanx/mimesis-patches",
+  "repo": "oliveira-sh/mimesis-patches",
   "patches": {
     "Fov": "1.5.4",
     "Minimap": "1.6.5"

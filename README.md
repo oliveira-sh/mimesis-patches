@@ -7,7 +7,7 @@ Patches for MIMESIS (released builds: EA 0.3.1; the code here targets EA 0.4.1, 
 ![Main menu with the Patches chip bottom-left, and the Patches window open](screenshots/menu.png)
 
 ## Game version
-The code in this repo targets **EA 0.4.1** (Steam build 26447295), the current game. It was ported to EA 0.4.0, and EA 0.4.1 needed no further changes: every patch builds against it and its hooks still match. The [releases](https://github.com/medovanx/mimesis-patches/releases), which the installer, Thunderstore and the Linux tool's `--source github` install, are still the **EA 0.3.1** builds, and on EA 0.4.0 and later several of them don't work:
+The code in this repo targets **EA 0.4.1** (Steam build 26447295), the current game. It was ported to EA 0.4.0, and EA 0.4.1 needed no further changes: every patch builds against it and its hooks still match. The [releases](https://github.com/oliveira-sh/mimesis-patches/releases), which the installer, Thunderstore and the Linux tool's `--source github` install, are still the **EA 0.3.1** builds, and on EA 0.4.0 and later several of them don't work:
 - No release shows the **Patches** chip on the main menu (the game renamed the text it looks for), so no patch's options can be changed in game.
 - **BiggerLobby 1.5.7**: lobbies still hold 10, but its result screen patch no longer fits the game and stops the rest from loading: no difficulty scaling and no 10-player spectator list. Its player list is for the old pause menu, which the game no longer opens.
 - **HostOptions 1.4.4**: Infinite Stamina and Starting money never show in the lobby (they were in the old Esc menu).
@@ -24,7 +24,7 @@ Fov, FpsCounter, Minimap, Revive and SpectatorCam still work, apart from the chi
 ## Install
 On EA 0.4.0 or later, read [Game version](#game-version) first: the installer installs the EA 0.3.1 builds.
 
-1. Download **`MimesisPatchesInstaller.exe`** from the [Releases page](https://github.com/medovanx/mimesis-patches/releases).
+1. Download **`MimesisPatchesInstaller.exe`** from the [Releases page](https://github.com/oliveira-sh/mimesis-patches/releases).
 2. Run it, tick the patches you want and click **Install / update selected**. It installs MelonLoader for you if you don't have it, and moves older installs over automatically. See [Installer](Installer/).
 3. In game, click the **Patches** chip in the bottom-left of the main menu to turn patches on/off and change their options. It turns orange when an update is available.
 
@@ -32,7 +32,7 @@ On EA 0.4.0 or later, read [Game version](#game-version) first: the installer in
 
 The mods are also coming to Thunderstore (team medovanx, MIMESIS community), so you'll be able to install them with r2modman or Gale.
 
-To install by hand instead: install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder and run the game once, then copy `<Patch>Runtime.dll` from the patch's [release](https://github.com/medovanx/mimesis-patches/releases) into the game's `Mods` folder.
+To install by hand instead: install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder and run the game once, then copy `<Patch>Runtime.dll` from the patch's [release](https://github.com/oliveira-sh/mimesis-patches/releases) into the game's `Mods` folder.
 
 ## Linux (Steam / Proton)
 MIMESIS only ships for Windows, so on Linux and Steam Deck Steam runs it with Proton. The patches work there too: install them with [`linux/mimesis-patches.py`](linux/) instead of the Windows installer. It needs Python 3.8+ and, to build the patches for the current game, the **.NET SDK 8** or newer ([how to install it](linux/README.md#building)):

@@ -9,7 +9,7 @@ Shows your frame rate in the bottom-right corner: `FPS: 144`. It updates twice a
 **Only you need it.**
 
 ## Install
-Use the [installer](../Installer/) and tick **FpsCounter**. Or install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder, run the game once, and copy `FpsCounterRuntime.dll` from the [latest FpsCounter release](https://github.com/medovanx/mimesis-patches/releases) into the game's `Mods` folder.
+Use the [installer](../Installer/) and tick **FpsCounter**. Or install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder, run the game once, and copy `FpsCounterRuntime.dll` from the [latest FpsCounter release](https://github.com/oliveira-sh/mimesis-patches/releases) into the game's `Mods` folder.
 
 ## Options
 **Patches > FpsCounter** on the main menu: turn it on or off.

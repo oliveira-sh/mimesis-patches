@@ -1,6 +1,7 @@
 # Hallucinations changelog
 
-## Unreleased
+## 1.1.0
+- Dead players steer the hallucination they send, and every dead player sees the hallucinations
 - The dead player who sends a hallucination steers it: the camera follows it, WASD / left stick move it, Shift runs, left click makes it attack (once), E lets go. If they let go, lose the camera, come back to life or drop out, it goes after the player on its own, as before.
 - Every dead player sees the living players' hallucinations while spectating (living players still only see their own). Only the target's game decides whether an attack lands.
 - Protocol 2: everyone in the game needs this version.

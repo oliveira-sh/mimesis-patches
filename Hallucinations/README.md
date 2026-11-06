@@ -2,7 +2,7 @@
 
 <p align="center"><img src="icon.png" width="160"></p>
 
-**Version 1.0.0**
+**Version 1.1.0**
 
 Radiation gets into your head. **Above 50% radiation**, dead teammates can send you **hallucinations**: a mimic only you (and the dead) can see, carrying a **shotgun**, a **bomb** or a **melee weapon**, **steered by the dead player who sent it**. It **vanishes the moment its attack lands** and does no damage at all, but you won't know that until it's gone. Shoot it or hit it and it vanishes too; your own weapons are real, so mind what else you hit.
 

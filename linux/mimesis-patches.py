@@ -78,9 +78,12 @@ PATCHES = [
     Patch("Fov", "Field of view slider", "Anyone"),
     Patch("Revive", "Revive dead teammates", "Host"),
     Patch("FpsCounter", "FPS in the bottom-right corner", "Anyone"),
-    Patch("MimicControl", "Dead players control mimics", "Host + possessor"),
+    Patch("Hallucinations", "Fake mimics at high radiation", "Everyone"),
 ]
 BY_NAME = {p.name: p for p in PATCHES}
+# Patches removed from this repo, with what replaced them. Their DLLs are deleted from Mods by install and uninstall:
+# a leftover would keep running, and this tool would no longer list it.
+RETIRED = {"MimicControl": "Hallucinations"}
 
 
 class Fail(Exception):
@@ -1435,6 +1438,23 @@ def remove_patch_dll(game, name):
     return removed
 
 
+def remove_retired(game):
+    """Deletes the DLLs of retired patches (RETIRED) from <game>/Mods, in any letter case. Returns their names."""
+    removed = []
+    if game.mods.is_dir():
+        for name in RETIRED:
+            for f in game.mods.iterdir():
+                if f.name.lower() == (name + "Runtime.dll").lower() and f.is_file():
+                    f.unlink()
+                    if name not in removed:
+                        removed.append(name)
+    for name in removed:
+        say("== %s: removed (retired, replaced by %s)" % (name, RETIRED[name]))
+    if removed:
+        say()
+    return removed
+
+
 def ensure_override(game):
     """Sets the DLL override in the prefix registry. Returns True when it (or Steam's launch option) is in place;
     otherwise says why at the end too (LATER)."""
@@ -1529,7 +1549,7 @@ def print_override_tip():
 
 def cmd_list(args):
     repo = args.repo_dir if is_repo(args.repo_dir) else None
-    say("%-13s %-9s %-16s %s" % ("Patch", "Version", "Needs it", "What it does"))
+    say("%-15s %-9s %-9s %s" % ("Patch", "Version", "Needs it", "What it does"))
     for p in PATCHES:
         version = "-"
         if repo is not None:
@@ -1539,10 +1559,9 @@ def cmd_list(args):
                 version = m.group(1) if m else "-"
             except (StopIteration, OSError):
                 pass
-        say("%-13s %-9s %-16s %s" % (p.name, version, p.who, p.about))
+        say("%-15s %-9s %-9s %s" % (p.name, version, p.who, p.about))
     say()
-    say("Needs it: Host = only the host needs it; Everyone = host and every player; Anyone = personal feature;")
-    say("          Host + possessor = the host and each player who wants to control a mimic.")
+    say("Needs it: Host = only the host needs it; Everyone = host and every player; Anyone = personal feature.")
     if repo is not None:
         say("Version: the version in this checkout (%s)." % repo)
     return 0
@@ -1608,11 +1627,11 @@ def cmd_status(args):
                 local = vstr(pe_file_version(dll)) if dll else None
                 if local and installed[p.name] and parse_version(local) > parse_version(installed[p.name]):
                     extra = paint("33", "  (local build %s is newer)" % local)
-            say("  %-13s %s%s" % (p.name, paint("32", installed[p.name] or "installed"), extra))
+            say("  %-15s %s%s" % (p.name, paint("32", installed[p.name] or "installed"), extra))
         else:
             where = " (old %s install: moved to MelonLoader by the next install)" % (
                 "BepInEx" if p.name in old.bep_patches else "Managed") if p.name in old.patches else ""
-            say("  %-13s -%s" % (p.name, where))
+            say("  %-15s -%s" % (p.name, where))
     others = sorted(f.name for f in game.mods.glob("*.dll")
                     if f.name.lower() not in {p.dll.lower() for p in PATCHES}) if game.mods.is_dir() else []
     if others:
@@ -1688,6 +1707,7 @@ def cmd_install(args):
         say("   sha256 verified")
         say()
     migrate(game)
+    remove_retired(game)
     done, override = install_ready(game, ready, ml_zip)
     write_marker(game, source, args.repo, args.repo_dir)
     if done:
@@ -1735,6 +1755,7 @@ def cmd_uninstall(args):
         say("== %s" % ("%s isn't installed" % removing[0] if len(removing) == 1 else "None of these patches are installed"))
     say()
     migrate(game)
+    remove_retired(game)
     if ready:
         install_ready(game, ready, ml_zip)
     marker = read_marker(game)

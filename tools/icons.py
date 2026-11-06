@@ -142,23 +142,25 @@ def fpscounter(d, cx, cy):
     d.text((cx, cy + 180), "FPS", font=font("seguibl.ttf", 150), fill=WHITE, anchor="mm")
 
 
-def mimiccontrol(d, cx, cy):
-    # A marionette: gold control bar, strings down to a figure with a mimic's red eyes.
-    d.line([(cx - 200, cy - 200), (cx + 200, cy - 200)], fill=GOLD, width=36)
-    d.line([(cx, cy - 250), (cx, cy - 130)], fill=GOLD, width=36)
-    for x0, y0, x1, y1 in [(-190, -200, -150, 40), (190, -200, 150, 40), (0, -130, 0, -40)]:
-        d.line([(cx + x0, cy + y0), (cx + x1, cy + y1)], fill=DIM, width=9)
-    d.line([(cx - 150, cy + 40), (cx - 62, cy + 175)], fill=WHITE, width=34, joint="curve")    # arms up to the strings
-    d.line([(cx + 150, cy + 40), (cx + 62, cy + 175)], fill=WHITE, width=34, joint="curve")
-    person(d, cx, cy + 150, 210, WHITE)
-    for ex in (-20, 20):
-        d.ellipse([cx + ex - 11, cy + 56, cx + ex + 11, cy + 76], fill=(220, 60, 50))
+def hallucinations(d, cx, cy):
+    # A mimic that isn't really there: a pale figure with red eyes and two shifted echoes (an illusion), and a gold
+    # radiation sign (it only shows at high radiation).
+    person(d, cx - 52, cy + 85, 330, (58, 116, 126))
+    person(d, cx + 52, cy + 85, 330, (126, 56, 56))
+    person(d, cx, cy + 85, 330, (206, 212, 206))
+    for ex in (-30, 30):
+        d.ellipse([cx + ex - 16, cy - 60, cx + ex + 16, cy - 32], fill=(220, 60, 50))
+    tx, ty, r = cx + 178, cy - 168, 72
+    for a in (240, 120, 0):
+        d.pieslice([tx - r, ty - r, tx + r, ty + r], a, a + 60, fill=GOLD)
+    d.ellipse([tx - 22, ty - 22, tx + 22, ty + 22], fill=(14, 18, 22))
+    d.ellipse([tx - 12, ty - 12, tx + 12, ty + 12], fill=GOLD)
 
 
 SYMBOLS = {
     "BiggerLobby": biggerlobby, "PSController": pscontroller, "SpectatorCam": spectatorcam, "Minimap": minimap,
     "HostOptions": hostoptions, "HudPercent": hudpercent, "Inventory": inventory, "LateJoin": latejoin,
-    "Fov": fov, "Revive": revive, "FpsCounter": fpscounter, "MimicControl": mimiccontrol,
+    "Fov": fov, "Revive": revive, "FpsCounter": fpscounter, "Hallucinations": hallucinations,
 }
 
 

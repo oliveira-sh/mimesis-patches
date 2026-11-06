@@ -5,19 +5,19 @@ Each patch has its own changelog:
 - [BiggerLobby](BiggerLobby/CHANGELOG.md)
 - [FpsCounter](FpsCounter/CHANGELOG.md)
 - [Fov](Fov/CHANGELOG.md)
+- [Hallucinations](Hallucinations/CHANGELOG.md)
 - [HostOptions](HostOptions/CHANGELOG.md)
 - [HudPercent](HudPercent/CHANGELOG.md)
 - [Installer](Installer/CHANGELOG.md)
 - [Inventory](Inventory/CHANGELOG.md)
 - [LateJoin](LateJoin/CHANGELOG.md)
-- [MimicControl](MimicControl/CHANGELOG.md)
 - [Minimap](Minimap/CHANGELOG.md)
 - [PSController](PSController/CHANGELOG.md)
 - [Revive](Revive/CHANGELOG.md)
 - [SpectatorCam](SpectatorCam/CHANGELOG.md)
 
 ## Unreleased
-- **New patch: MimicControl** (host + possessing player): a dead player who possesses a mimic controls it, walking, running and grabbing living players until it dies, within the host's rules. See [MimicControl](MimicControl/README.md).
+- **New patch: Hallucinations** (host and every player): above 50% radiation a living player can be sent hallucinations by dead teammates (E while spectating them): fake mimics only that player sees, which come at them with a shotgun, a bomb or a melee weapon and vanish the moment the attack lands, doing no damage. Possession stays as in the game (the dead player only speaks through the mimic), but while they talk through it, living players within 10 m gain radiation (1% per second, never past 90%). Host settings are published in the lobby data. See [Hallucinations](Hallucinations/README.md). It replaces MimicControl (dead players driving a possessed mimic), which was never released and is removed: delete `MimicControlRuntime.dll` from the game's `Mods` folder if you installed a build of it (the Linux tool's `install` and `uninstall` now do that for you).
 - **Linux (Steam with Proton)**: [`linux/mimesis-patches.py`](linux/README.md) installs, updates, builds and removes the patches, like the Windows installer: MelonLoader, the Wine DLL override in the game's Proton prefix, and the patches built against your game.
 - **Game update EA 0.4.0**: BiggerLobby, HostOptions, HudPercent, Inventory, LateJoin and PSController are ported to the new game; Fov and SpectatorCam fixed for its new features; Revive fixed; Minimap and FpsCounter checked. Details in each patch's CHANGELOG.
 - **Game update EA 0.4.1** (Steam build 26447295): all patches checked against it, none needed changes. They build, every hook and transpiler still matches the game code, and the game data they rely on is unchanged.

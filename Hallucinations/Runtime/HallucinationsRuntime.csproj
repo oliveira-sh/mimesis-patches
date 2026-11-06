@@ -3,7 +3,7 @@
     <Version>1.0.0</Version>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>MimicControlRuntime</AssemblyName>
+    <AssemblyName>HallucinationsRuntime</AssemblyName>
     <Authors>Mohamed Darwesh</Authors>
     <Copyright>Mohamed Darwesh (github.com/medovanx)</Copyright>
   </PropertyGroup>
@@ -13,13 +13,17 @@
     <PackageReference Include="Lib.Harmony" Version="2.3.6" />
     <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-    <!-- Publicized: the patches read and write the game's private possession, AI and camera state directly. -->
+    <!-- Publicized: the patches read the game's private camera, possession, voice, puppet and admin-command state. -->
     <Reference Include="Assembly-CSharp" Publicize="true"><HintPath>$(GameDll)</HintPath><Private>false</Private></Reference>
+    <!-- MasterAudio (PlaySoundResult, returned by the game's AudioManager.PlaySfx* calls the fake attacker makes). -->
+    <Reference Include="Assembly-CSharp-firstpass"><HintPath>$(Managed)\Assembly-CSharp-firstpass.dll</HintPath><Private>false</Private></Reference>
     <!-- Steam lobby data: the host publishes its settings there (like Inventory). -->
     <Reference Include="com.rlabrecque.steamworks.net"><HintPath>$(Managed)\com.rlabrecque.steamworks.net.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.Cinemachine"><HintPath>$(Managed)\Unity.Cinemachine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.InputSystem"><HintPath>$(Managed)\Unity.InputSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(Managed)\UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(Managed)\UnityEngine.AudioModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Managed)\UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(Managed)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UIModule"><HintPath>$(Managed)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>

@@ -1,5 +1,8 @@
 # Installer changelog
 
+## 5.3.0
+- Adds BetterMimics, Poltergeist, Traitor, Deathmatch, BetterMicrophone and FakePlayers.
+
 ## 5.2.0
 - Installs from the oliveira-sh/mimesis-patches fork, whose releases are built for MIMESIS EA 0.4.1.
 - Adds Hallucinations; removes the retired MimicControl DLL if it's in the Mods folder.

@@ -46,6 +46,12 @@ namespace MimesisInstaller
             new("Revive", "Revive dead teammates", "Host"),
             new("FpsCounter", "FPS in the bottom-right corner", "Anyone"),
             new("Hallucinations", "Fake mimics at high radiation", "Everyone"),
+            new("BetterMicrophone", "Noise removal for your voice", "Anyone"),
+            new("FakePlayers", "Fake players for testing (off by default)", "Host"),
+            new("BetterMimics", "Mimics that act like your friends", "Host"),
+            new("Poltergeist", "Random hauntings and jumpscares", "Anyone"),
+            new("Traitor", "Traitor destination on the tram", "Everyone"),
+            new("Deathmatch", "Deathmatch destination on the tram", "Everyone"),
         };
 
         // Long timeout: patch files and the installer itself can be slow to download on some connections.

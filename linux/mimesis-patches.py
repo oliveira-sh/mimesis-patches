@@ -79,8 +79,15 @@ PATCHES = [
     Patch("Revive", "Revive dead teammates", "Host"),
     Patch("FpsCounter", "FPS in the bottom-right corner", "Anyone"),
     Patch("Hallucinations", "Fake mimics at high radiation", "Everyone"),
+    Patch("BetterMicrophone", "Noise removal for your voice", "Anyone"),
+    Patch("FakePlayers", "Fake players for testing (off by default)", "Host"),
+    Patch("BetterMimics", "Mimics that act like your friends", "Host"),
+    Patch("Poltergeist", "Random hauntings and jumpscares", "Anyone"),
+    Patch("Traitor", "Traitor destination on the tram", "Everyone"),
+    Patch("Deathmatch", "Deathmatch destination on the tram", "Everyone"),
 ]
 BY_NAME = {p.name: p for p in PATCHES}
+NAME_W = max(len(p.name) for p in PATCHES)   # the patch name column, so every row lines up
 # Patches removed from this repo, with what replaced them. Their DLLs are deleted from Mods by install and uninstall:
 # a leftover would keep running, and this tool would no longer list it.
 RETIRED = {"MimicControl": "Hallucinations"}
@@ -1250,7 +1257,7 @@ def build_patch(repo, game, name, dotnet, verbose=False):
     out = max(outs, key=lambda p: p.stat().st_mtime) if outs else None
     if rc == 0 and out is not None:
         atomic_copy(out, dist / dll)
-        good("   %-12s built %s (%.0fs)" % (name, vstr(pe_file_version(dist / dll)) or "", time.time() - start))
+        good("   %-*s built %s (%.0fs)" % (NAME_W, name, vstr(pe_file_version(dist / dll)) or "", time.time() - start))
         return dist / dll
     errors = list(dict.fromkeys(line.strip() for line in lines if re.search(r": error [A-Z]+\d*:", line)))
     error("%s: build failed (exit code %d)" % (name, rc))
@@ -1310,7 +1317,7 @@ def prepare_local(args, game, names):
                 dotnet, reason_no_sdk = find_dotnet()
                 checked = True
             if dotnet:
-                say("   %-12s %s, building..." % (name, why))
+                say("   %-*s %s, building..." % (NAME_W, name, why))
                 built = build_patch(repo, game, name, dotnet, args.verbose)
                 if built is None:
                     failed.append(name)
@@ -1328,7 +1335,7 @@ def prepare_local(args, game, names):
             continue
         ready[name] = (dll, vstr(pe_file_version(dll)))
         if not why or args.no_build or not dotnet:
-            say("   %-12s %s  %s" % (name, ready[name][1] or "?", dll))
+            say("   %-*s %s  %s" % (NAME_W, name, ready[name][1] or "?", dll))
     if checked and not dotnet and failed:
         say()
         say(DOTNET_HELP)
@@ -1344,7 +1351,7 @@ def prepare_github(args, game, names):
     for name in names:
         rel = releases.get(name)
         if rel is None:
-            say("   %-12s not released yet, skipped" % name)
+            say("   %-*s not released yet, skipped" % (NAME_W, name))
             skipped.append(name)
             continue
         try:
@@ -1356,7 +1363,7 @@ def prepare_github(args, game, names):
         ready[name] = (dll, vstr(rel.version))
         if rel.published:
             published.append(rel.published)
-        say("   %-12s %s  (released %s)" % (name, vstr(rel.version),
+        say("   %-*s %s  (released %s)" % (NAME_W, name, vstr(rel.version),
                                             rel.published.astimezone().strftime("%Y-%m-%d") if rel.published else "?"))
     say()
     msg = ("GitHub releases are built for the game version that was current when they were published (upstream's "
@@ -1549,7 +1556,7 @@ def print_override_tip():
 
 def cmd_list(args):
     repo = args.repo_dir if is_repo(args.repo_dir) else None
-    say("%-15s %-9s %-9s %s" % ("Patch", "Version", "Needs it", "What it does"))
+    say("%-*s %-9s %-9s %s" % (NAME_W, "Patch", "Version", "Needs it", "What it does"))
     for p in PATCHES:
         version = "-"
         if repo is not None:
@@ -1559,7 +1566,7 @@ def cmd_list(args):
                 version = m.group(1) if m else "-"
             except (StopIteration, OSError):
                 pass
-        say("%-15s %-9s %-9s %s" % (p.name, version, p.who, p.about))
+        say("%-*s %-9s %-9s %s" % (NAME_W, p.name, version, p.who, p.about))
     say()
     say("Needs it: Host = only the host needs it; Everyone = host and every player; Anyone = personal feature.")
     if repo is not None:
@@ -1627,11 +1634,11 @@ def cmd_status(args):
                 local = vstr(pe_file_version(dll)) if dll else None
                 if local and installed[p.name] and parse_version(local) > parse_version(installed[p.name]):
                     extra = paint("33", "  (local build %s is newer)" % local)
-            say("  %-15s %s%s" % (p.name, paint("32", installed[p.name] or "installed"), extra))
+            say("  %-*s %s%s" % (NAME_W, p.name, paint("32", installed[p.name] or "installed"), extra))
         else:
             where = " (old %s install: moved to MelonLoader by the next install)" % (
                 "BepInEx" if p.name in old.bep_patches else "Managed") if p.name in old.patches else ""
-            say("  %-15s -%s" % (p.name, where))
+            say("  %-*s -%s" % (NAME_W, p.name, where))
     others = sorted(f.name for f in game.mods.glob("*.dll")
                     if f.name.lower() not in {p.dll.lower() for p in PATCHES}) if game.mods.is_dir() else []
     if others:

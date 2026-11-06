@@ -157,10 +157,96 @@ def hallucinations(d, cx, cy):
     d.ellipse([tx - 12, ty - 12, tx + 12, ty + 12], fill=GOLD)
 
 
+def fakeplayers(d, cx, cy):
+    # Fake players: a player in front of two greyed copies, and a gold "+" (add one).
+    person(d, cx - 150, cy + 40, 300, (110, 124, 130))
+    person(d, cx + 150, cy + 40, 300, (110, 124, 130))
+    person(d, cx, cy + 95, 360, WHITE)
+    for ex in (-34, 34):
+        d.ellipse([cx + ex - 16, cy - 58, cx + ex + 16, cy - 26], fill=(30, 38, 44))
+    bx, by, r = cx + 185, cy - 175, 70
+    d.ellipse([bx - r, by - r, bx + r, by + r], fill=GOLD)
+    d.rectangle([bx - 40, by - 12, bx + 40, by + 12], fill=(14, 18, 22))
+    d.rectangle([bx - 12, by - 40, bx + 12, by + 40], fill=(14, 18, 22))
+
+
+def bettermicrophone(d, cx, cy):
+    # A microphone between noise coming in (jagged, red) and a clean voice going out (smooth gold waves).
+    d.rounded_rectangle([cx - 95, cy - 235, cx + 95, cy + 60], 95, fill=WHITE)
+    for y in (-150, -95, -40):
+        d.line([(cx - 62, cy + y), (cx + 62, cy + y)], fill=(150, 160, 165), width=16)
+    d.arc([cx - 150, cy - 110, cx + 150, cy + 150], 0, 180, fill=WHITE, width=28)
+    d.rectangle([cx - 14, cy + 150, cx + 14, cy + 210], fill=WHITE)
+    d.rounded_rectangle([cx - 105, cy + 200, cx + 105, cy + 236], 18, fill=WHITE)
+    pts = [(cx - 330 + i * 15, cy - 70 + (55 if i % 2 else -55) * (0.45 + 0.55 * ((i * 7) % 5) / 4)) for i in range(13)]
+    d.line(pts, fill=(220, 80, 70), width=18, joint="curve")
+    for r, c in ((95, GOLD), (150, GOLD), (205, (200, 165, 80))):
+        d.arc([cx + 120 - r, cy - 70 - r, cx + 120 + r, cy - 70 + r], -38, 38, fill=c, width=22)
+
+
+def bettermimics(d, cx, cy):
+    # Two players side by side, one of them a mimic: same body, but its eyes glow red; it talks too (gold bubble).
+    person(d, cx - 120, cy + 95, 340, WHITE)
+    person(d, cx + 120, cy + 95, 340, (206, 212, 206))
+    for ex in (-30, 30):
+        d.ellipse([cx - 120 + ex - 15, cy - 56, cx - 120 + ex + 15, cy - 28], fill=(30, 38, 44))
+        d.ellipse([cx + 120 + ex - 15, cy - 56, cx + 120 + ex + 15, cy - 28], fill=(220, 60, 50))
+    bx, by = cx + 150, cy - 190
+    d.rounded_rectangle([bx - 110, by - 70, bx + 110, by + 60], 40, fill=GOLD)
+    d.polygon([(bx - 60, by + 50), (bx - 10, by + 50), (bx - 70, by + 110)], fill=GOLD)
+    for i in range(3):
+        d.ellipse([bx - 62 + i * 50, by - 18, bx - 38 + i * 50, by + 6], fill=(14, 18, 22))
+
+
+def poltergeist(d, cx, cy):
+    # A ghost (round top, wavy hem, hollow eyes) and a flickering bulb.
+    top, hem = cy - 200, cy + 200
+    d.pieslice([cx - 190, top, cx + 190, top + 380], 180, 360, fill=(206, 212, 206))
+    d.rectangle([cx - 190, top + 189, cx + 190, hem - 40], fill=(206, 212, 206))
+    for i in range(5):
+        x0 = cx - 190 + i * 76
+        d.pieslice([x0, hem - 80, x0 + 76, hem], 0, 180, fill=(206, 212, 206))
+    for ex in (-70, 70):
+        d.ellipse([cx + ex - 38, cy - 90, cx + ex + 38, cy - 2], fill=(14, 18, 22))
+    d.ellipse([cx - 34, cy + 40, cx + 34, cy + 120], fill=(14, 18, 22))
+    bx, by = cx + 205, cy - 185
+    d.ellipse([bx - 58, by - 70, bx + 58, by + 46], fill=GOLD)
+    d.rectangle([bx - 30, by + 40, bx + 30, by + 86], fill=(150, 160, 165))
+    for a in (-150, -90, -30):
+        r = math.radians(a)
+        d.line([(bx + 80 * math.cos(r), by - 12 + 80 * math.sin(r)), (bx + 118 * math.cos(r), by - 12 + 118 * math.sin(r))], fill=GOLD, width=16)
+
+
+def traitor(d, cx, cy):
+    # Three players; the one in the middle hides a red knife behind its back.
+    person(d, cx - 170, cy + 95, 300, (150, 158, 160))
+    person(d, cx + 170, cy + 95, 300, (150, 158, 160))
+    d.polygon([(cx + 40, cy - 40), (cx + 70, cy - 40), (cx + 205, cy - 230), (cx + 182, cy - 250)], fill=(220, 60, 50))
+    d.rectangle([cx + 28, cy - 50, cx + 82, cy - 28], fill=(110, 70, 50))
+    person(d, cx, cy + 105, 360, WHITE)
+    for ex in (-34, 34):
+        d.ellipse([cx + ex - 16, cy - 50, cx + ex + 16, cy - 18], fill=(30, 38, 44))
+
+
+def deathmatch(d, cx, cy):
+    # A gold crosshair on a player, and a coin (each death pays the team).
+    person(d, cx - 40, cy + 110, 380, (206, 212, 206))
+    r = 165
+    d.ellipse([cx - 40 - r, cy - 70 - r, cx - 40 + r, cy - 70 + r], outline=GOLD, width=26)
+    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+        d.line([(cx - 40 + dx * 105, cy - 70 + dy * 105), (cx - 40 + dx * 230, cy - 70 + dy * 230)], fill=GOLD, width=26)
+    bx, by, c = cx + 200, cy - 190, 66
+    d.ellipse([bx - c, by - c, bx + c, by + c], fill=GOLD)
+    d.ellipse([bx - c + 18, by - c + 18, bx + c - 18, by + c - 18], outline=(200, 150, 50), width=10)
+    d.text((bx, by + 4), "$", font=font("seguibl.ttf", 80), fill=(120, 80, 20), anchor="mm")
+
+
 SYMBOLS = {
     "BiggerLobby": biggerlobby, "PSController": pscontroller, "SpectatorCam": spectatorcam, "Minimap": minimap,
     "HostOptions": hostoptions, "HudPercent": hudpercent, "Inventory": inventory, "LateJoin": latejoin,
     "Fov": fov, "Revive": revive, "FpsCounter": fpscounter, "Hallucinations": hallucinations,
+    "FakePlayers": fakeplayers, "BetterMicrophone": bettermicrophone, "BetterMimics": bettermimics,
+    "Poltergeist": poltergeist, "Traitor": traitor, "Deathmatch": deathmatch,
 }
 
 
@@ -207,7 +293,7 @@ if __name__ == "__main__":
     for p in SYMBOLS:
         icon(p).save(out / f"{p}.png")
     # contact sheet
-    sheet = Image.new("RGB", (256 * 6, 256 * 2), (0, 0, 0))
+    sheet = Image.new("RGB", (256 * 6, 256 * ((len(SYMBOLS) + 5) // 6)), (0, 0, 0))
     for i, p in enumerate(SYMBOLS):
         sheet.paste(Image.open(out / f"{p}.png"), ((i % 6) * 256, (i // 6) * 256))
     sheet.save(out / "_sheet.png")

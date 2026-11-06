@@ -63,6 +63,12 @@ In game, the Patches window still shows when an update is available. Under Proto
 | [HudPercent](HudPercent/) | 1.4.0 | Optional | Optional | Health and radiation percentages next to the HUD bars |
 | [FpsCounter](FpsCounter/) | 1.2.0 | Optional | Optional | Frame rate in the bottom-right corner |
 | [Hallucinations](Hallucinations/) | 1.1.0 | Yes | Yes | Above 50% radiation you may see fake mimics, sent by dead teammates (E while spectating); a dead player talking through a possessed mimic raises the radiation of players nearby |
+| [BetterMicrophone](BetterMicrophone/) | 1.0.0 | Optional | Optional | Cleaner voice: the game's neural noise remover turned on, hum and rumble filters, silence between words, even volume, higher voice quality; mic test |
+| [FakePlayers](FakePlayers/) | 1.0.0 | Optional | No | Testing tool, off by default: F7 adds fake players to your game and sets their health, radiation, alive/dead and position |
+| [BetterMimics](BetterMimics/) | 1.0.0 | Optional | No | Mimics act like the people they copy: one voice each, turn-taking and reply-like answers, they look at whoever talks, pick up scrap, join your dances, walk instead of flip-flopping into a run |
+| [Poltergeist](Poltergeist/) | 1.0.0 | Optional | Optional | Random harmless hauntings: whispers in teammates' voices, eerie sounds, flickering lights, figures in the distance, jumpscares |
+| [Traitor](Traitor/) | 1.0.0 | Yes | Yes | The tram can offer a traitor job: everyone arrives alone inside the building, one player is secretly the traitor and monsters ignore them |
+| [Deathmatch](Deathmatch/) | 1.0.0 | Yes | Yes | The tram can offer a deathmatch: everyone arrives alone inside the building, only mimics, a lent loaded double-barrel shotgun each, every death pays the team but the dead lose what they carry |
 
 **Host / Player**: who needs the patch. *Yes* = required, *No* = not needed, *Optional* = personal feature, install it if you want it.
 
@@ -95,7 +101,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 
 ## Releasing
-`python tools/release.py Fov HostOptions --note "What changed" --token tss_...` bumps the version, updates the CHANGELOG (the note, then what's under *Unreleased*) and README, builds, commits, creates the GitHub release (installer and in-game updates) and uploads to Thunderstore (Gale / r2modman). Add `--minor` for a minor version, `--no-thunderstore` for GitHub only, `--dry-run` to preview. The token is a Thunderstore service account token (Teams > medovanx > Service accounts).
+`python tools/release.py Fov HostOptions --note "What changed" --token tss_...` bumps the version, updates the CHANGELOG (the note, then what's under *Unreleased*) and README, builds, commits, creates the GitHub release (installer and in-game updates) and uploads to Thunderstore (Gale / r2modman). Add `--minor` for a minor version, `--first` for a new patch's first release (its version as it is, the note optional), `--no-thunderstore` for GitHub only, `--dry-run` to preview. The token is a Thunderstore service account token (Teams > medovanx > Service accounts).
 
 ## AI disclosure
 These mods were made with the help of an AI coding assistant (Claude, by Anthropic): code, documentation and icons.

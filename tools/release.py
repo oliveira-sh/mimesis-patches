@@ -1,8 +1,10 @@
 """Releases one or more patches everywhere players get them, in one go.
 
     python tools/release.py Fov HostOptions --note "Fixed the slider" --token tss_... [--minor] [--no-thunderstore] [--dry-run]
+    python tools/release.py BetterMimics Traitor --first --no-thunderstore     (new patches: their version as it is)
 
-For each patch: bump the version (patch number, or minor with --minor), add the note to its CHANGELOG (followed by
+For each patch: bump the version (patch number, or minor with --minor; a new patch's first release with --first keeps the
+version it has), add the note to its CHANGELOG (followed by
 what's under "## Unreleased" there), update the version in its README and the root table, build it twice (the normal DLL with the in-game updater, for GitHub;
 and -p:Thunderstore=1 without any updater code, for the Thunderstore package) and package it. Then commit and push, create the
 GitHub release (installer users and the in-game Update button get it from there) and upload the package to
@@ -44,6 +46,13 @@ def bump(patch, minor):
     root = ROOT / "README.md"
     root.write_text(re.sub(rf"(\| \[{patch}\]\({patch}/\) \| )[0-9.]+", rf"\g<1>{new}", root.read_text(encoding="utf-8")), encoding="utf-8")
     return old, new
+
+
+def current(patch):
+    """A new patch's first release: the version it has now, unchanged."""
+    csproj = next((ROOT / patch / "Runtime").glob("*.csproj"))
+    v = re.search(r"<Version>([^<]+)</Version>", csproj.read_text(encoding="utf-8")).group(1)
+    return v, v
 
 
 def changelog(patch, version, note):
@@ -119,8 +128,9 @@ def upload_thunderstore(zip_path, token):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("patches", nargs="+", help="patch folder names, e.g. Fov HostOptions")
-    ap.add_argument("--note", required=True, help="what changed (one CHANGELOG bullet per line)")
+    ap.add_argument("--note", help="what changed (one CHANGELOG bullet per line); optional with --first")
     ap.add_argument("--minor", action="store_true", help="bump the minor version instead of the patch number")
+    ap.add_argument("--first", action="store_true", help="new patches' first release: the version they have now, no bump")
     ap.add_argument("--token", help="Thunderstore service account token (tss_...)")
     ap.add_argument("--no-thunderstore", action="store_true", help="GitHub release only")
     ap.add_argument("--dry-run", action="store_true", help="show what would happen, change nothing")
@@ -129,6 +139,13 @@ def main():
     for p in args.patches:
         if p not in DESCRIPTIONS:
             sys.exit(f"Unknown patch: {p}")
+    if not args.note and not args.first:
+        sys.exit('Pass --note "what changed".')
+    if args.first:
+        for p in args.patches:
+            v = current(p)[1]
+            if subprocess.run(["gh", "release", "view", "-R", REPO, f"{p}-v{v}"], cwd=ROOT, capture_output=True).returncode == 0:
+                sys.exit(f"{p} {v} is released already: leave out --first to release the next version.")
     token = args.token
     ts = not args.no_thunderstore
     if ts and not token and any(p in THUNDERSTORE for p in args.patches):
@@ -139,13 +156,13 @@ def main():
     for p in args.patches:
         print(f"== {p}")
         if args.dry_run:
-            print(f"  would bump, add to CHANGELOG, build and package {p}")
+            print(f"  would {'release it as ' + current(p)[1] if args.first else 'bump it'}, add to CHANGELOG, build and package {p}")
             continue
-        old, new = bump(p, args.minor)
-        entry = changelog(p, new, args.note)
+        old, new = current(p) if args.first else bump(p, args.minor)
+        entry = changelog(p, new, args.note or "")
         dll = build(p, False)
         done.append((p, new, entry, dll, package(p, out)))
-        print(f"  {old} -> {new}")
+        print(f"  {old} -> {new}" if old != new else f"  {new} (first release)")
 
     if args.dry_run:
         return

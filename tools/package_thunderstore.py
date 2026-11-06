@@ -24,6 +24,12 @@ DESCRIPTIONS = {
     "Revive": "Stand next to a dead teammate for a few seconds to revive them. Host only.",
     "FpsCounter": "Shows your frame rate in the bottom-right corner (FPS: 144).",
     "Hallucinations": "Above 50% radiation, dead teammates can send you hallucinations (E while spectating): fake mimics only you see, that attack and vanish, no damage. Talking through a possessed mimic raises nearby radiation (never past 90%). Everyone needs it.",
+    "BetterMicrophone": "Cleaner voice for everyone who hears you: the game's neural noise remover (RNNoise) turned on, rumble and hum filters, silence between words, even volume, a limiter and a higher voice bitrate. Mic test with before/after. Only you need it.",
+    "FakePlayers": "Testing tool (off by default): while hosting, F7 adds fake players to your level and sets their health, radiation, alive/dead and position, so you can try things without a second person. Host only.",
+    "BetterMimics": "Mimics that act like your friends: one voice each, quiet next to the person they copy, turn-taking and reply-like answers, looking at whoever talks, picking up scrap, joining your dances, walking instead of flip-flopping into a run. Host only.",
+    "Poltergeist": "Random hauntings while you explore: whispers in your teammates' voices, eerie sounds, flickering lights, figures in the distance and something right behind you when you turn around. Harmless, only you see yours. No host needed.",
+    "Traitor": "A traitor destination on the tram: everyone arrives alone inside the building, one player is secretly the traitor and monsters ignore them. Catch the traitor for gold. Everyone needs it.",
+    "Deathmatch": "A deathmatch destination on the tram: everyone arrives alone inside the building, only mimics, a lent loaded double-barrel shotgun each, every death pays the team gold but the dead lose what they carry. Everyone needs it.",
 }
 
 

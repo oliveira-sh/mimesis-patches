@@ -15,7 +15,9 @@
 //                   handler does nothing anyway. Only ever sent to players who said hello.
 // Neither packet is recorded in match replays. The host's own game goes through the same dispatchers (virtual
 // sessions), so hosting needs no special case. Message flow: hello/Ack at each level, Request -> Result to the dead
-// player and Spawn to the target, End from the target -> Outcome to the dead player.
+// player and Spawn to the target, Placed from the target -> Show to every dead player (Ctl = who steers it), Drive/Attack
+// from whoever moves it (the steering dead player, or the target's game once it runs on its own) -> forwarded to the
+// others, Release when steering stops, End from the target -> Outcome to the dead player and Gone to every dead player.
 // Everything here is the contract between the host side and the client side: change it on both sides at once and
 // bump Const.ProtocolVersion.
 
@@ -54,7 +56,7 @@ namespace Hallucinations
     {
         /// <summary>Wire protocol version. A host ignores a hello of another version; a client ignores messages of another
         /// version. Both then stay vanilla.</summary>
-        public const int ProtocolVersion = 1;
+        public const int ProtocolVersion = 2;
         public const string HarmonyId = "medovanx.hallucinations";
         /// <summary>Steam lobby data key with the host's settings (Settings.Encode). Informational: clients enable the
         /// feature from the host's ack, not from the lobby (that also covers games without a Steam lobby).</summary>
@@ -75,6 +77,15 @@ namespace Hallucinations
         public const float RequestTimeoutSec = 3f;
         /// <summary>Debug: Ctrl+Shift+J adds this much radiation to yourself (host-validated, never past the talk cap).</summary>
         public const int DebugContaStepPct = 10;
+
+        /// <summary>Whoever moves a hallucination (the dead player steering it, or the target's game when it runs on its
+        /// own) sends its pose this often while it moves, and at IdleSendInterval while it stands.</summary>
+        public const float MoveSendInterval = 0.1f;
+        public const float IdleSendInterval = 0.5f;
+        /// <summary>Target: a steered hallucination with no pose from its dead player for this long runs on its own (AI).</summary>
+        public const float SteerStaleSec = 3f;
+        /// <summary>Target: after it appeared, the dead player has this long to start steering before it runs on its own.</summary>
+        public const float SteerStartSec = 4f;
     }
 
     static class Log
@@ -119,6 +130,15 @@ namespace Hallucinations
         End = 3,
         /// <summary>Debug only: add radiation to the sender.</summary>
         DebugConta = 4,
+        /// <summary>The target placed its hallucination (where it appeared): the host shows it to the dead players.</summary>
+        Placed = 5,
+        /// <summary>Its pose (position, facing, walk/run), from whoever moves it: the dead player steering it, or the
+        /// target's game while it runs on its own.</summary>
+        Drive = 6,
+        /// <summary>It attacks now (facing Yaw), from whoever moves it.</summary>
+        Attack = 7,
+        /// <summary>The steering dead player lets go (or the target's game took over): it runs on its own from now.</summary>
+        Release = 8,
     }
 
     /// <summary>Host -> client operations.</summary>
@@ -134,6 +154,25 @@ namespace Hallucinations
         Result = 3,
         /// <summary>To the requester: how its hallucination ended.</summary>
         Outcome = 4,
+        /// <summary>To a dead player: a hallucination is there (where, what it carries, who steers it: Ctl).</summary>
+        Show = 5,
+        /// <summary>Its pose, forwarded to everyone who shows it except the one moving it.</summary>
+        Drive = 6,
+        /// <summary>It attacks, forwarded likewise.</summary>
+        Attack = 7,
+        /// <summary>To the dead players who show it: it's gone (Outcome).</summary>
+        Gone = 8,
+        /// <summary>Steering changed hands: to the target (the dead player let go: run it on your own) or to the dead
+        /// player (the target's game took it over).</summary>
+        Release = 9,
+    }
+
+    /// <summary>How a hallucination moves right now (Drive's "m").</summary>
+    enum MoveKind
+    {
+        Idle = 0,
+        Walk = 1,
+        Run = 2,
     }
 
     /// <summary>What the fake attacker carries. Melee: the victim's game picks bat, crowbar, frying pan or folding chair
@@ -238,6 +277,18 @@ namespace Hallucinations
         public int Id;             // End: hallucination id
         public Outcome Outcome;    // End
         public int Pct;            // DebugConta: radiation to add, in percent
+        public Pose Pose;          // Placed, Drive (position, yaw, move); Attack (yaw only)
+        public int Seq;            // Drive: the sender's counter (older poses are dropped)
+    }
+
+    /// <summary>Where a hallucination is: on the wire as centimetres and whole degrees (ints, see Protocol).</summary>
+    struct Pose
+    {
+        public Vector3 Pos;
+        public float Yaw;
+        public MoveKind Move;
+
+        public Pose(Vector3 pos, float yaw, MoveKind move) { Pos = pos; Yaw = yaw; Move = move; }
     }
 
     /// <summary>A host -> client message as a client reads it (one flat struct: the fields the op doesn't use stay at
@@ -265,8 +316,12 @@ namespace Hallucinations
         public Result Result;
         public int Target;             // Result, Outcome
         public int CooldownLeftMs;
-        // Outcome
+        // Outcome, Gone
         public Outcome Outcome;
+        // Show, Drive, Attack
+        public Pose Pose;
+        public int Seq;                // Drive
+        public int Ctl;                // Spawn, Show: actor id of the dead player who steers it (0 = it runs on its own)
     }
 
     /// <summary>Builds and reads every packet of the protocol. HostLogic and the client side only go through here, so the
@@ -288,6 +343,24 @@ namespace Hallucinations
         public static AdminCommandReq End(int id, Outcome outcome) => C2S(Op.End, ("id", id), ("o", (int)outcome));
 
         public static AdminCommandReq DebugConta(int pct) => C2S(Op.DebugConta, ("p", pct));
+
+        public static AdminCommandReq Placed(int id, Vector3 pos, float yaw) =>
+            C2S(Op.Placed, ("id", id), ("x", Cm(pos.x)), ("y", Cm(pos.y)), ("z", Cm(pos.z)), ("a", Deg(yaw)));
+
+        public static AdminCommandReq Drive(int id, in Pose p, int seq) =>
+            C2S(Op.Drive, ("id", id), ("x", Cm(p.Pos.x)), ("y", Cm(p.Pos.y)), ("z", Cm(p.Pos.z)), ("a", Deg(p.Yaw)), ("m", (int)p.Move), ("s", seq));
+
+        public static AdminCommandReq Attack(int id, float yaw) => C2S(Op.Attack, ("id", id), ("a", Deg(yaw)));
+
+        public static AdminCommandReq Release(int id) => C2S(Op.Release, ("id", id));
+
+        /// <summary>Metres to whole centimetres (the wire carries ints only).</summary>
+        static int Cm(float metres) => Mathf.RoundToInt(Mathf.Clamp(metres, -100000f, 100000f) * 100f);
+
+        static int Deg(float yaw) => Mathf.RoundToInt(Mathf.Repeat(yaw, 360f)) % 360;
+
+        static Pose ReadPose(int x, int y, int z, int a, int m) =>
+            new Pose(new Vector3(x / 100f, y / 100f, z / 100f), a, m >= (int)MoveKind.Idle && m <= (int)MoveKind.Run ? (MoveKind)m : MoveKind.Idle);
 
         static AdminCommandReq C2S(Op op, params (string key, int value)[] fields)
         {
@@ -324,6 +397,24 @@ namespace Hallucinations
                     return true;
                 case Op.DebugConta:
                     return TryInt(args["p"], out m.Pct);
+                case Op.Placed:
+                case Op.Drive:
+                {
+                    if (!TryInt(args["id"], out m.Id) || !TryInt(args["x"], out int x) || !TryInt(args["y"], out int y) ||
+                        !TryInt(args["z"], out int z) || !TryInt(args["a"], out int a)) return false;
+                    TryInt(args["m"], out int mv);
+                    TryInt(args["s"], out m.Seq);
+                    m.Pose = ReadPose(x, y, z, a, mv);
+                    return true;
+                }
+                case Op.Attack:
+                {
+                    if (!TryInt(args["id"], out m.Id) || !TryInt(args["a"], out int a)) return false;
+                    m.Pose = new Pose(Vector3.zero, a, MoveKind.Idle);
+                    return true;
+                }
+                case Op.Release:
+                    return TryInt(args["id"], out m.Id);
                 default:
                     return false;
             }
@@ -357,7 +448,8 @@ namespace Hallucinations
             return S2C(receiverId, sb);
         }
 
-        public static DebugInfoSig Spawn(int receiverId, int id, Weapon weapon, int seed, int ttlMs, int fromActorId, bool debug)
+        /// <summary>ctlActorId: the dead player who will steer it (0 = it runs on its own from the start).</summary>
+        public static DebugInfoSig Spawn(int receiverId, int id, Weapon weapon, int seed, int ttlMs, int fromActorId, bool debug, int ctlActorId)
         {
             var sb = S2CBegin(Sop.Spawn);
             Add(sb, "id", id);
@@ -366,7 +458,64 @@ namespace Hallucinations
             Add(sb, "ttl", ttlMs);
             Add(sb, "from", fromActorId);
             Add(sb, "dbg", debug ? 1 : 0);
+            Add(sb, "ctl", ctlActorId);
             return S2C(receiverId, sb);
+        }
+
+        /// <summary>To a dead player. ttlLeftMs: what's left of its lifetime; ctlActorId: who steers it (the receiver itself
+        /// = "you steer it"; 0 = nobody).</summary>
+        public static DebugInfoSig Show(int receiverId, int id, Weapon weapon, int seed, int ttlLeftMs, int targetId, int ctlActorId, in Pose pose)
+        {
+            var sb = S2CBegin(Sop.Show);
+            Add(sb, "id", id);
+            Add(sb, "w", (int)weapon);
+            Add(sb, "seed", seed);
+            Add(sb, "ttl", ttlLeftMs);
+            Add(sb, "t", targetId);
+            Add(sb, "ctl", ctlActorId);
+            AddPose(sb, pose);
+            return S2C(receiverId, sb);
+        }
+
+        public static DebugInfoSig DriveS(int receiverId, int id, in Pose pose, int seq)
+        {
+            var sb = S2CBegin(Sop.Drive);
+            Add(sb, "id", id);
+            AddPose(sb, pose);
+            Add(sb, "s", seq);
+            return S2C(receiverId, sb);
+        }
+
+        public static DebugInfoSig AttackS(int receiverId, int id, float yaw)
+        {
+            var sb = S2CBegin(Sop.Attack);
+            Add(sb, "id", id);
+            Add(sb, "a", Deg(yaw));
+            return S2C(receiverId, sb);
+        }
+
+        public static DebugInfoSig Gone(int receiverId, int id, Outcome outcome)
+        {
+            var sb = S2CBegin(Sop.Gone);
+            Add(sb, "id", id);
+            Add(sb, "o", (int)outcome);
+            return S2C(receiverId, sb);
+        }
+
+        public static DebugInfoSig ReleaseS(int receiverId, int id)
+        {
+            var sb = S2CBegin(Sop.Release);
+            Add(sb, "id", id);
+            return S2C(receiverId, sb);
+        }
+
+        static void AddPose(StringBuilder sb, in Pose p)
+        {
+            Add(sb, "x", Cm(p.Pos.x));
+            Add(sb, "y", Cm(p.Pos.y));
+            Add(sb, "z", Cm(p.Pos.z));
+            Add(sb, "a", Deg(p.Yaw));
+            Add(sb, "m", (int)p.Move);
         }
 
         public static DebugInfoSig Result(int receiverId, int nonce, Result result, int id, int targetId, int cooldownLeftMs)
@@ -401,6 +550,7 @@ namespace Hallucinations
             m.Targets = Array.Empty<int>();
             if (!IsOurs(sig)) return false;
             bool hasVersion = false, hasOp = false;
+            int px = 0, py = 0, pz = 0, pa = 0, pm = 0;
             foreach (var part in sig.debugInfo.Substring(Const.S2CMagic.Length).Split(';'))
             {
                 int eq = part.IndexOf('=');
@@ -438,8 +588,16 @@ namespace Hallucinations
                     case "t": m.Target = n; break;
                     case "left": m.CooldownLeftMs = n; break;
                     case "o": m.Outcome = (Outcome)n; break;
+                    case "ctl": m.Ctl = n; break;
+                    case "s": m.Seq = n; break;
+                    case "x": px = n; break;
+                    case "y": py = n; break;
+                    case "z": pz = n; break;
+                    case "a": pa = n; break;
+                    case "m": pm = n; break;
                 }
             }
+            m.Pose = ReadPose(px, py, pz, pa, pm);
             return hasVersion && hasOp && m.Op != Sop.None;
         }
 

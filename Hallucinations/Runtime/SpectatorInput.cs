@@ -67,9 +67,22 @@ namespace Hallucinations
         /// <summary>The host's Ack changed what we may do: refresh the tip now.</summary>
         internal static void OnViewChanged() => _nextTipAt = 0f;
 
+        /// <summary>Spectate gave the HUD back after steering (it reset the tips): ours is set up again from scratch.</summary>
+        internal static void OnSteeringEnded()
+        {
+            _tipUi = null;
+            _nextTipAt = 0f;
+        }
+
         /// <summary>C2, every frame while dead. True = run vanilla; false = E was ours this frame.</summary>
         internal static bool OnUpdateMimicPossession(CameraManager cm)
         {
+            // Steering a hallucination: E lets go of it, and never possesses a mimic meanwhile.
+            if (Spectate.Steering)
+            {
+                Spectate.OnInteract();
+                return false;
+            }
             if (cm == null || cm.Mode != CameraManager.CameraMode.PlayerSpectate || cm._waitServerResponse) return true;
             if (!ClientNet.View.Supported || FreeCamera(cm)) return true;
             var input = Hub.s != null ? Hub.s.inputman : null;
@@ -95,7 +108,7 @@ namespace Hallucinations
         /// to the game.</summary>
         internal static void ApplyTip(UIPrefab_Spectator ui)
         {
-            if (_applying || ui == null) return;
+            if (_applying || ui == null || Spectate.Steering) return; // Spectate shows the steering tips meanwhile
             _applying = true;
             try
             {

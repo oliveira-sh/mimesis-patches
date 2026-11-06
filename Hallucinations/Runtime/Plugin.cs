@@ -16,7 +16,9 @@
 //   ClientNet.cs       every player: the per-frame driver, the inbox, hello/ack
 //   SpectatorInput.cs  dead player: E (possess or hallucinate) and the spectator HUD tip
 //   Victim.cs          living player: shows the hallucinations sent to them, reports how they end
-//   FakeMimic.cs       living player: the fake attacker itself (puppet, weapon, movement, attack, vanish)
+//   FakeMimic.cs       the fake attacker itself (puppet, weapon, movement, attack, vanish), on the target's game and
+//                      on the dead players' games
+//   Spectate.cs        dead players: seeing the hallucinations, and steering the one you sent
 //   Placement.cs       living player: where to put it (outside the view)
 //   DebugKeys.cs       testing keys (Debug setting)
 
@@ -109,8 +111,9 @@ namespace Hallucinations
                     PatchUi.Section(page, font, "How it works");
                     PatchUi.Label(page, font,
                         "Dead: watch a player whose radiation is above the threshold and press E / LT to send them a hallucination: " +
-                        "a fake mimic only they see, outside their view, that comes at them with a shotgun, a bomb or a melee weapon " +
-                        "and vanishes when its attack lands. It does no damage. When a mimic can be possessed, E possesses it as in the " +
+                        "a fake mimic only they (and the dead) see, outside their view, with a shotgun, a bomb or a melee weapon. " +
+                        "You steer it: WASD moves, Shift runs, left click attacks (once: it vanishes with its attack), E lets go " +
+                        "(it carries on by itself). It does no damage. When a mimic can be possessed, E possesses it as in the " +
                         "game; the tip on your HUD says which one E does.\n" +
                         "While a dead player talks through a possessed mimic, living players within range of it, on the same side " +
                         "(indoors or outdoors), gain radiation.\n" +

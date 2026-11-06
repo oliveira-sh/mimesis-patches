@@ -4,14 +4,14 @@
 
 **Version 1.0.0**
 
-Radiation gets into your head. **Above 50% radiation**, dead teammates can send you **hallucinations**: a mimic only you can see, which comes at you with a **shotgun**, a **bomb** or a **melee weapon** and **vanishes the moment its attack lands**. It does no damage at all, but you won't know that until it's gone. Shoot it or hit it and it vanishes too; your own weapons are real, so mind what else you hit.
+Radiation gets into your head. **Above 50% radiation**, dead teammates can send you **hallucinations**: a mimic only you (and the dead) can see, carrying a **shotgun**, a **bomb** or a **melee weapon**, **steered by the dead player who sent it**. It **vanishes the moment its attack lands** and does no damage at all, but you won't know that until it's gone. Shoot it or hit it and it vanishes too; your own weapons are real, so mind what else you hit.
 
 Dead players keep possessing mimics as in the game, to speak through them. But **while they talk through a mimic, living players near it gain radiation** (1% per second within 10 m and on the same side, indoors or outdoors, never past 90%: talking never kills). The more they talk, the sooner you start seeing things.
 
 **Everyone needs it**: the host checks the rules and passes the hallucinations on, the dead player sends them, the living player sees them. With a host that doesn't have it, nothing changes. A player who doesn't have it is never sent one (and talk radiation still reaches them, since only the host needs it for that).
 
 ## Install
-There's no release yet, so the [installer](../Installer/) skips it. On Linux, `python3 linux/mimesis-patches.py install Hallucinations` builds and installs it (see the [Linux tool](../linux/)). On Windows, build it (`dotnet build -c Release` in `Hallucinations/Runtime`; the DLL ends up in `bin/Release/net472/`) or use the host's build, install [MelonLoader](https://github.com/LavaGang/MelonLoader/releases) (x64, 0.7.x) into the game folder, run the game once, then copy `HallucinationsRuntime.dll` into the game's `Mods` folder. See [Playing with friends](../README.md#playing-with-friends).
+Use the [installer](../Installer/) (Windows) or `python3 linux/mimesis-patches.py install Hallucinations` on Linux (see the [Linux tool](../linux/)). Everyone needs the same version.
 
 It replaces MimicControl, an earlier unreleased patch that let dead players drive the mimic they possess. If you installed a build of it, delete `MimicControlRuntime.dll` from the game's `Mods` folder (the Linux tool's `install` and `uninstall` do it for you).
 
@@ -21,7 +21,21 @@ It replaces MimicControl, an earlier unreleased patch that let dead players driv
 | Send a hallucination to the player you watch (radiation above 50%) | **E** | **LT** |
 | Possess a mimic near them (as in the game) | **E** | **LT** |
 
-E does one or the other: when a mimic can be possessed, E possesses it, as in the game; otherwise, if the player you watch is above the threshold, E sends them a hallucination. The tip on your HUD says which: *Possess*, *Hallucinate*, or *Hallucinate (12)* while you wait for your cooldown. You can't see the hallucination you sent, but the tip tells you how it went. Keys follow your bindings in the game's settings.
+E does one or the other: when a mimic can be possessed, E possesses it, as in the game; otherwise, if the player you watch is above the threshold, E sends them a hallucination. The tip on your HUD says which: *Possess*, *Hallucinate*, or *Hallucinate (12)* while you wait for your cooldown. Keys follow your bindings in the game's settings.
+
+**You steer the hallucination you sent.** It appears out of their sight and your camera follows it:
+
+| Steering | Keyboard / mouse | Controller |
+|---|---|---|
+| Move (relative to your camera) | W A S D | Left stick |
+| Run | Shift | LB |
+| Look around | Mouse | Right stick |
+| Attack (once: it vanishes with its attack) | Left click | RB |
+| Let go (it carries on by itself) | E | LT |
+
+Whether its attack lands is decided on the target's game (where they really are). If you let go, lose the camera (switching player, free camera), come back to life or drop out, the hallucination goes after them on its own.
+
+**Every dead player sees the hallucinations** of the living players while they spectate, steered or not. Living players only see their own.
 
 The *Hallucinate* tip only shows once the player you watch is above the threshold (and has the patch): until then E does what it does in the game. With [SpectatorCam](../SpectatorCam/)'s free camera on, E flies the camera instead, so the tip is hidden: press F to go back to the normal camera first.
 

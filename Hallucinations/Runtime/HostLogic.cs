@@ -46,12 +46,28 @@ namespace Hallucinations
             /// hallucination's cooldown on another target stays).</summary>
             public long CooldownUntil;
 
+            /// <summary>The living player who sees it.</summary>
+            public VPlayer Target;
+            public int Seed;
+            /// <summary>The dead player who steers it (the requester), until they let go or leave; null = nobody.</summary>
+            public VPlayer Controller;
+            /// <summary>True while Controller moves it; false = the target's game runs it on its own (AI).</summary>
+            public bool Controlled;
+            /// <summary>The target placed it (Op.Placed): dead players can be shown it from now.</summary>
+            public bool Placed;
+            public Pose Pose;
+            public int LastSeq;
+            /// <summary>Dead players who were sent Show for it (they get its poses, attacks and end).</summary>
+            public readonly HashSet<VPlayer> Shown = new HashSet<VPlayer>(ByRef.Instance);
+
             public long ExpiresAt => SpawnedAt + TtlMs + Const.SlotSlackMs;
         }
 
         static readonly Dictionary<VPlayer, ClientInfo> _clients = new Dictionary<VPlayer, ClientInfo>(ByRef.Instance);
         static readonly Dictionary<ulong, long> _cooldown = new Dictionary<ulong, long>();
         static readonly Dictionary<VPlayer, Slot> _active = new Dictionary<VPlayer, Slot>(ByRef.Instance);
+        static readonly Dictionary<int, Slot> _byId = new Dictionary<int, Slot>();
+        static readonly List<VPlayer> _viewers = new List<VPlayer>();
         static readonly List<VPlayer> _scratch = new List<VPlayer>();
         static readonly List<int> _targets = new List<int>();
         static readonly Weapon[] _pool = new Weapon[3];
@@ -92,6 +108,10 @@ namespace Hallucinations
                     case Op.Request: OnRequest(sender, m); break;
                     case Op.End: OnEnd(sender, m); break;
                     case Op.DebugConta: OnDebugConta(sender, m); break;
+                    case Op.Placed: OnPlaced(sender, m); break;
+                    case Op.Drive: OnDrive(sender, m); break;
+                    case Op.Attack: OnAttack(sender, m); break;
+                    case Op.Release: OnRelease(sender, m); break;
                 }
             }
             catch (Exception e) { Log.ErrorOnce("command", "Handling a command failed: " + e); }
@@ -161,7 +181,7 @@ namespace Hallucinations
             {
                 if (now < busy.ExpiresAt) { Refuse(p, m, Result.Busy); return; }
                 // Its end report never came (lost, or the target's game dropped it): forget it.
-                _active.Remove(t);
+                Forget(busy, Outcome.Cancelled);
                 Log.Trace($"Hallucination #{busy.Id} on {Name(t)} expired without an end report");
             }
 
@@ -170,9 +190,12 @@ namespace Hallucinations
             int seed = _rng.Next(int.MinValue, int.MaxValue);
             int ttl = Settings.LifetimeMs;
             long cooldownUntil = self ? 0L : now + Settings.CooldownMs;
+            // The dead player who sent it steers it (their hello said they can send, so they can steer); a debug
+            // self-spawn runs on its own.
+            var ctl = self ? null : p;
 
-            SendTo(t, Protocol.Spawn(t.ObjectID, id, weapon, seed, ttl, self ? 0 : p.ObjectID, self));
-            _active[t] = new Slot
+            SendTo(t, Protocol.Spawn(t.ObjectID, id, weapon, seed, ttl, self ? 0 : p.ObjectID, self, ctl != null ? ctl.ObjectID : 0));
+            var slot = new Slot
             {
                 Id = id,
                 Requester = self ? null : p,
@@ -182,7 +205,13 @@ namespace Hallucinations
                 TtlMs = ttl,
                 Debug = self,
                 CooldownUntil = cooldownUntil,
+                Target = t,
+                Seed = seed,
+                Controller = ctl,
+                Controlled = ctl != null,
             };
+            _active[t] = slot;
+            _byId[id] = slot;
             if (!self) _cooldown[p.SteamID] = cooldownUntil;
             SendTo(p, Protocol.Result(p.ObjectID, m.Nonce, Result.Ok, id, t.ObjectID, self ? 0 : ClampMs(Settings.CooldownMs)));
             Log.Info($"Hallucination #{id}: {Name(p)} -> {Name(t)} ({weapon}, radiation {Pct(conta)}%{(self ? ", debug" : "")})");
@@ -206,9 +235,9 @@ namespace Hallucinations
                 Log.Trace($"End of hallucination #{m.Id} from {Name(p)} ignored (not their active one)");
                 return;
             }
-            _active.Remove(p);
             var outcome = m.Outcome;
             if (outcome <= Outcome.None || outcome > Outcome.Missed) outcome = Outcome.Cancelled;   // unknown: no refund
+            Forget(a, outcome);
 
             bool refunded = false;
             if (Outcomes.Refunds(outcome) && !a.Debug &&
@@ -223,6 +252,105 @@ namespace Hallucinations
             if (to != null && InRoom(to, p.VRoom))
                 SendTo(to, Protocol.OutcomeMsg(to.ObjectID, a.Id, outcome, p.ObjectID));
             Log.Info($"Hallucination #{a.Id} on {Name(p)} ended: {outcome}" + (refunded ? " (cooldown refunded)" : ""));
+        }
+
+        // ========================================================================= dead players: show and steer
+
+        /// <summary>The target placed its hallucination: from now the dead players see it, and its controller steers it.</summary>
+        static void OnPlaced(VPlayer p, in ClientMsg m)
+        {
+            if (!_byId.TryGetValue(m.Id, out var s) || !ReferenceEquals(s.Target, p) || s.Placed) return;
+            s.Placed = true;
+            s.Pose = m.Pose;
+            ShowToDead(s);
+            Log.Trace($"Hallucination #{s.Id} placed; shown to {s.Shown.Count} dead player(s)" +
+                      (s.Controlled ? $", {Name(s.Controller)} steers it" : ""));
+        }
+
+        /// <summary>A pose from whoever moves it (the controller while it steers, else the target's game). Forwarded to the
+        /// target (when the controller moves it) and to every dead player shown it, except the sender.</summary>
+        static void OnDrive(VPlayer p, in ClientMsg m)
+        {
+            if (!_byId.TryGetValue(m.Id, out var s) || !s.Placed || !IsMover(s, p)) return;
+            if (m.Seq != 0 && m.Seq <= s.LastSeq) return; // older than the last one (reordered or replayed)
+            s.LastSeq = m.Seq;
+            s.Pose = m.Pose;
+            ShowToDead(s); // players who died since it appeared see it from now
+            if (!ReferenceEquals(p, s.Target)) SendTo(s.Target, Protocol.DriveS(s.Target.ObjectID, s.Id, s.Pose, m.Seq));
+            foreach (var v in s.Shown)
+                if (!ReferenceEquals(v, p) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.DriveS(v.ObjectID, s.Id, s.Pose, m.Seq));
+        }
+
+        /// <summary>It attacks (whoever moves it says so): the target's game decides whether it lands; the others play it.</summary>
+        static void OnAttack(VPlayer p, in ClientMsg m)
+        {
+            if (!_byId.TryGetValue(m.Id, out var s) || !s.Placed || !IsMover(s, p)) return;
+            if (!ReferenceEquals(p, s.Target)) SendTo(s.Target, Protocol.AttackS(s.Target.ObjectID, s.Id, m.Pose.Yaw));
+            foreach (var v in s.Shown)
+                if (!ReferenceEquals(v, p) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.AttackS(v.ObjectID, s.Id, m.Pose.Yaw));
+            Log.Trace($"Hallucination #{s.Id} attacks ({(ReferenceEquals(p, s.Target) ? "on its own" : "steered by " + Name(p))})");
+        }
+
+        /// <summary>The controller lets go, or the target's game took it over (no poses from the controller): it runs on
+        /// its own from now; the other side is told.</summary>
+        static void OnRelease(VPlayer p, in ClientMsg m)
+        {
+            if (!_byId.TryGetValue(m.Id, out var s) || !s.Controlled) return;
+            if (ReferenceEquals(p, s.Controller)) StopSteering(s, "let go", tellTarget: true, tellController: false);
+            else if (ReferenceEquals(p, s.Target)) StopSteering(s, "taken over by the target's game", tellTarget: false, tellController: true);
+        }
+
+        /// <summary>p is who moves s right now.</summary>
+        static bool IsMover(Slot s, VPlayer p) =>
+            s.Controlled ? ReferenceEquals(p, s.Controller) : ReferenceEquals(p, s.Target);
+
+        static void StopSteering(Slot s, string why, bool tellTarget, bool tellController)
+        {
+            if (!s.Controlled) return;
+            s.Controlled = false;
+            s.LastSeq = 0; // the target's game counts its own poses
+            if (tellTarget && InRoom(s.Target, s.Target.VRoom)) SendTo(s.Target, Protocol.ReleaseS(s.Target.ObjectID, s.Id));
+            if (tellController && s.Controller != null && InRoom(s.Controller, s.Target.VRoom))
+                SendTo(s.Controller, Protocol.ReleaseS(s.Controller.ObjectID, s.Id));
+            Log.Info($"Hallucination #{s.Id}: {Name(s.Controller)} no longer steers it ({why})");
+        }
+
+        /// <summary>Show to every dead player (hello'd, showing hallucinations, in the target's level) not shown yet.</summary>
+        static void ShowToDead(Slot s)
+        {
+            if (!s.Placed || s.Target == null) return;
+            var room = s.Target.VRoom;
+            _viewers.Clear();
+            try
+            {
+                foreach (var kv in _clients)
+                {
+                    var v = kv.Key;
+                    if ((kv.Value.Caps & Caps.Render) == 0 || ReferenceEquals(v, s.Target) || s.Shown.Contains(v)) continue;
+                    if (!ReferenceEquals(v.VRoom, room) || !InRoom(v, room) || v.LifeCycle != VCreatureLifeCycle.Dead) continue;
+                    _viewers.Add(v);
+                }
+                if (_viewers.Count == 0) return;
+                long left = s.SpawnedAt + s.TtlMs - Control.NowMs;
+                foreach (var v in _viewers)
+                {
+                    int ctl = s.Controlled && s.Controller != null ? s.Controller.ObjectID : 0;
+                    SendTo(v, Protocol.Show(v.ObjectID, s.Id, s.Weapon, s.Seed, ClampMs(left), s.Target.ObjectID, ctl, s.Pose));
+                    s.Shown.Add(v);
+                }
+            }
+            finally { _viewers.Clear(); }
+        }
+
+        /// <summary>It's over (any reason): forget it, and the dead players shown it remove theirs.</summary>
+        static void Forget(Slot s, Outcome outcome)
+        {
+            if (s.Target != null && _active.TryGetValue(s.Target, out var cur) && ReferenceEquals(cur, s)) _active.Remove(s.Target);
+            _byId.Remove(s.Id);
+            var room = s.Target != null ? s.Target.VRoom : null;
+            foreach (var v in s.Shown)
+                if (InRoom(v, room)) SendTo(v, Protocol.Gone(v.ObjectID, s.Id, outcome));
+            s.Shown.Clear();
         }
 
         // =================================================================================== debug conta (6.4)
@@ -276,6 +404,7 @@ namespace Hallucinations
             _clients.Clear();
             _cooldown.Clear();
             _active.Clear();
+            _byId.Clear();
         }
 
         /// <summary>H3 (prefix: the player is still in the room): forget them; if they could be a target, the others in
@@ -288,7 +417,7 @@ namespace Hallucinations
             bool known = _clients.Remove(p);
             if (_active.TryGetValue(p, out var slot))
             {
-                _active.Remove(p);
+                Forget(slot, Outcome.Cancelled);
                 // The requester learns it was cut short (no refund: it did reach the player).
                 var to = slot.Requester;
                 if (to != null && InRoom(to, room))
@@ -296,7 +425,16 @@ namespace Hallucinations
                 Log.Info($"Hallucination #{slot.Id} on {Name(p)} dropped: they left");
             }
             foreach (var s in _active.Values)
+            {
                 if (ReferenceEquals(s.Requester, p)) s.Requester = null;
+                // Its controller left: the target's game runs it on its own from now.
+                if (ReferenceEquals(s.Controller, p))
+                {
+                    StopSteering(s, "they left", tellTarget: true, tellController: false);
+                    s.Controller = null;
+                }
+                s.Shown.Remove(p);
+            }
             if (wasTarget) AckOthers(room, p);
             if (known) Log.Trace($"{Name(p)} left {room.GetType().Name}: forgotten");
         }

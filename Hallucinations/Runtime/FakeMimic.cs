@@ -61,6 +61,19 @@ namespace Hallucinations
 
         enum Phase { Stalk, Charge, Windup, Attack, Vanish }
 
+        /// <summary>Who moves it on this game.
+        /// Ai: the target's game, on its own (the original behaviour).
+        /// Remote: the target's game, following the poses of the dead player who steers it; it still decides here
+        ///         whether its attack lands and whether the player hit it.
+        /// Viewer: a dead player's game, showing it where its mover says.
+        /// Driver: the steering dead player's game, moving it from their input.</summary>
+        internal enum Mode { Ai, Remote, Viewer, Driver }
+
+        const float RemoteSnapDistance = 6f;     // a pose this far off is a jump, not a step: snap
+        const float RemoteFollowRate = 12f;      // 1/s, exponential approach to the last pose
+        const float RemoteSlackSeconds = 3f;     // viewers/driver: it can't outlive its lifetime by more than this
+        const float CamRootHeight = 1.55f;       // the steering player's orbit camera follows this point
+
         /// <summary>One way to attack: the real animation state and its hit frame (from the clip events).</summary>
         sealed class AttackSpec
         {
@@ -100,6 +113,25 @@ namespace Hallucinations
         internal bool IsVanishing => _phase == Phase.Vanish;
         internal Vector3 Chest => transform.position + Vector3.up * ChestHeight;
         internal Vector3 Head => transform.position + Vector3.up * HeadHeight;
+        internal Mode CurrentMode => _mode;
+        internal bool IsAttacking => _phase == Phase.Attack;
+        internal Transform CamRoot { get; private set; }
+        /// <summary>Where it is now, for its mover's Drive messages.</summary>
+        internal Pose CurrentPose => new Pose(transform.position, transform.eulerAngles.y, _curMove);
+
+        // ---- who moves it ----
+        Mode _mode;
+        Action<FakeMimic, Outcome> _onEnded;
+        Action<FakeMimic> _onAttack;
+        Action<FakeMimic> _onTakeOver;
+        MoveKind _curMove;
+        Vector3 _rPos;            // the last pose its mover sent (Remote, Viewer)
+        float _rYaw;
+        MoveKind _rMove;
+        bool _rHas;
+        float _lastRemoteAt;
+        Vector3 _dDir;            // the steering player's input this frame (Driver)
+        bool _dRun;
 
         // ---- state ----
         GameMainBase _main;
@@ -120,7 +152,7 @@ namespace Hallucinations
         Phase _phase;
         float _spawnedAt, _ttl, _phaseAt, _attackT, _vanishAt, _nextTintAt, _nextRouteAt, _nextDoorCheckAt, _noWayFor, _directOffUntil;
         float _hideAt = HideAt;
-        bool _hit, _fired, _exploded, _explosionFxShown, _quiet, _noDespawnEffect, _hidden;
+        bool _hit, _fired, _exploded, _explosionFxShown, _quiet, _noDespawnEffect, _hidden, _attackEnded;
         readonly List<Vector3> _path = new List<Vector3>();
         int _pathIdx, _routeFails;
         readonly HashSet<string> _playedItemSfx = new HashSet<string>();
@@ -128,9 +160,13 @@ namespace Hallucinations
         // ======================================================================================== creation (9.1-9.2)
 
         /// <summary>Builds the fake at pos facing yaw and starts it. Null (and nothing left behind) when it can't be built.
-        /// navOk false: the spot came from the physics fallback (no client navmesh), so it walks straight.</summary>
-        internal static FakeMimic Create(GameMainBase main, in HostMsg spawn, Vector3 pos, float yaw, bool navOk)
+        /// navOk false: the spot came from the physics fallback (no client navmesh), so it walks straight.
+        /// onEnded: called exactly once when it ends (any reason); onAttack: when it starts an attack on its own (Ai).</summary>
+        internal static FakeMimic Create(GameMainBase main, int id, Weapon weapon, int seed, int ttlMs, Vector3 pos, float yaw,
+            bool navOk, Mode mode, Action<FakeMimic, Outcome> onEnded, Action<FakeMimic> onAttack = null,
+            Action<FakeMimic> onTakeOver = null)
         {
+            var spawn = new HostMsg { Id = id, Weapon = weapon, Seed = seed, TtlMs = ttlMs };
             GameObject root = null;
             PuppetScript puppet = null;
             try
@@ -167,14 +203,27 @@ namespace Hallucinations
                 MakeInert(puppetGo);
                 AddHeadMarker(puppetGo.transform);
 
+                var camRoot = new GameObject("HallucinationCamRoot").transform;
+                camRoot.SetParent(root.transform, false);
+                camRoot.localPosition = Vector3.up * CamRootHeight;
+
                 var fake = root.AddComponent<FakeMimic>();
                 fake.Id = spawn.Id;
                 fake.Puppet = puppet;
+                fake.CamRoot = camRoot;
                 fake._anim = anim;
                 fake._main = main;
                 fake._avatar = main != null ? main.GetMyAvatar() : null;
                 fake._navOk = navOk;
                 fake._tint = puppetGo.GetComponent<PuppetContaAppearance>();
+                fake._mode = mode;
+                fake._onEnded = onEnded;
+                fake._onAttack = onAttack;
+                fake._onTakeOver = onTakeOver;
+                fake._rPos = pos;
+                fake._rYaw = yaw;
+                fake._rHas = mode == Mode.Viewer || mode == Mode.Driver;
+                fake._lastRemoteAt = Time.time;
                 Victim.RegisterPuppet(puppet);
 
                 root.SetActive(true);
@@ -425,10 +474,33 @@ namespace Hallucinations
                 }
                 float now = Time.time, dt = Time.deltaTime;
                 if (_beepPending) TryBeep(now);
-                if (now - _spawnedAt > _ttl)
+                bool targetSide = _mode == Mode.Ai || _mode == Mode.Remote;
+                // The target's game ends it on time; the others keep theirs a little longer (its Gone message ends it).
+                if (now - _spawnedAt > _ttl + (targetSide ? 0f : RemoteSlackSeconds))
                 {
                     Vanish(Outcome.Timeout);
                     return;
+                }
+
+                if (!targetSide)
+                {
+                    // A dead player's game: only show it (Viewer) or move it from input (Driver). No hit checks here.
+                    if (_phase == Phase.Attack) AttackUpdate(dt, transform.position, transform.position, 0f);
+                    else if (_mode == Mode.Driver) DriveStep(dt);
+                    else FollowRemote(dt);
+                    return;
+                }
+                if (_mode == Mode.Remote && _phase != Phase.Attack)
+                {
+                    // Steered by a dead player: no poses for a while (they dropped out) -> it runs on its own.
+                    float limit = _rHas ? Const.SteerStaleSec : Const.SteerStartSec;
+                    if (now - _lastRemoteAt > limit)
+                    {
+                        Log.Info($"Hallucination #{Id}: its dead player stopped steering it; it goes on its own");
+                        SetMode(Mode.Ai);
+                        try { _onTakeOver?.Invoke(this); }
+                        catch (Exception e) { Log.ErrorOnce("fake-takeover", "Reporting the take-over failed: " + e); }
+                    }
                 }
 
                 var cam = Camera.main;
@@ -443,6 +515,12 @@ namespace Hallucinations
                     return;
                 }
 
+                if (_mode == Mode.Remote)
+                {
+                    if (_phase == Phase.Attack) AttackUpdate(dt, me, eye, dist);
+                    else FollowRemote(dt);
+                    return;
+                }
                 switch (_phase)
                 {
                     case Phase.Stalk:
@@ -480,10 +558,12 @@ namespace Hallucinations
             if (!scene.IsGameLogicRunning) return "the level ended"; // exit cutscene and results: same scene and avatar
             var me = main.GetMyAvatar();
             if (me == null || !ReferenceEquals(me, _avatar)) return "your avatar changed";
+            if (Control.IsReplay) return "replay";
+            if (_mode == Mode.Viewer || _mode == Mode.Driver)
+                return me.dead ? null : "you're alive again"; // only dead players see the others' hallucinations
             if (me.dead) return "you died";
             var cm = Hub.s != null ? Hub.s.cameraman : null;
             if (cm != null && cm.IsSpectatorMode) return "spectating";
-            if (Control.IsReplay) return "replay";
             return null;
         }
 
@@ -616,6 +696,7 @@ namespace Hallucinations
             Face(dir, dt);
             Puppet.Move(dir * speed, WalkSpeed, RunSpeed);
             Puppet.UpdateMoveType(speed > WalkSpeed + 0.1f ? ActorMoveType.Run : ActorMoveType.Walk);
+            _curMove = speed > WalkSpeed + 0.1f ? MoveKind.Run : MoveKind.Walk;
             return floorOk;
         }
 
@@ -623,6 +704,143 @@ namespace Hallucinations
         {
             Puppet.Move(Vector3.zero, WalkSpeed, RunSpeed); // eases to 0 (PuppetScript's velocity stickiness)
             Puppet.UpdateMoveType(ActorMoveType.Walk);
+            _curMove = MoveKind.Idle;
+        }
+
+        // ================================================================================= steered / shown by others
+
+        /// <summary>Remote, Viewer: glide to the last pose its mover sent; animate from the actual motion.</summary>
+        void FollowRemote(float dt)
+        {
+            if (!_rHas || dt <= 0f)
+            {
+                StandStill();
+                return;
+            }
+            Vector3 pos = transform.position;
+            Vector3 next = (_rPos - pos).sqrMagnitude > RemoteSnapDistance * RemoteSnapDistance
+                ? _rPos
+                : Vector3.Lerp(pos, _rPos, 1f - Mathf.Exp(-RemoteFollowRate * dt));
+            transform.position = next;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.Euler(0f, _rYaw, 0f), TurnSpeed * dt);
+            Vector3 vel = Placement.Flat(next - pos) / dt;
+            if (_rMove == MoveKind.Idle && vel.magnitude < 0.3f)
+            {
+                StandStill();
+                return;
+            }
+            float speed = _rMove == MoveKind.Run ? RunSpeed : WalkSpeed;
+            // The pose's speed, in the direction it actually moves (a slow glide still walks, not slides).
+            Vector3 dir = vel.sqrMagnitude > 0.0001f ? vel.normalized : transform.forward;
+            Puppet.Move(dir * speed, WalkSpeed, RunSpeed);
+            Puppet.UpdateMoveType(_rMove == MoveKind.Run ? ActorMoveType.Run : ActorMoveType.Walk);
+            _curMove = _rMove;
+        }
+
+        /// <summary>Driver: one step of the steering player's input along the floor; walls and drops stop it (it slides
+        /// along a wall when only one axis is blocked).</summary>
+        void DriveStep(float dt)
+        {
+            Vector3 dir = Placement.Flat(_dDir);
+            if (dir.sqrMagnitude < 0.01f || dt <= 0f)
+            {
+                StandStill();
+                return;
+            }
+            if (dir.sqrMagnitude > 1f) dir.Normalize();
+            float speed = _dRun ? RunSpeed : WalkSpeed;
+            Vector3 pos = transform.position;
+            Vector3 step = dir * (speed * dt);
+            if (!TryStep(pos, step, out Vector3 next) &&
+                !TryStep(pos, new Vector3(step.x, 0f, 0f), out next) &&
+                !TryStep(pos, new Vector3(0f, 0f, step.z), out next))
+            {
+                StandStill();
+                Face(dir, dt);
+                return;
+            }
+            transform.position = next;
+            Face(dir, dt);
+            Puppet.Move(dir * speed, WalkSpeed, RunSpeed);
+            Puppet.UpdateMoveType(_dRun ? ActorMoveType.Run : ActorMoveType.Walk);
+            _curMove = _dRun ? MoveKind.Run : MoveKind.Walk;
+        }
+
+        /// <summary>A step is fine when nothing solid is in the way at knee and chest height and there's a floor within a
+        /// stair step of where it stands.</summary>
+        bool TryStep(Vector3 pos, Vector3 step, out Vector3 next)
+        {
+            next = pos;
+            float len = step.magnitude;
+            if (len < 0.0001f) return false;
+            Vector3 ahead = step / len * (len + 0.3f); // keep a body's width from walls
+            if (!PhysicsUtility.CheckBlockByWall(pos + Vector3.up * 0.5f, pos + Vector3.up * 0.5f + ahead)) return false;
+            if (!PhysicsUtility.CheckBlockByWall(pos + Vector3.up * ChestHeight, pos + Vector3.up * ChestHeight + ahead)) return false;
+            Vector3 to = pos + step;
+            Vector3 floor = PhysicsUtility.DropToFloor(to, 0.6f, 1.6f);
+            if (floor == to || Mathf.Abs(floor.y - pos.y) > MaxFloorStep + len) return false; // a drop, or a wall step
+            next = new Vector3(to.x, floor.y, to.z);
+            return true;
+        }
+
+        /// <summary>Remote/Viewer: a new pose from its mover.</summary>
+        internal void ApplyRemote(in Pose p)
+        {
+            if (_phase == Phase.Vanish) return;
+            _rPos = p.Pos;
+            _rYaw = p.Yaw;
+            _rMove = p.Move;
+            _rHas = true;
+            _lastRemoteAt = Time.time;
+        }
+
+        /// <summary>Driver: the steering player's input for this frame (world direction on the ground, run).</summary>
+        internal void SetDriveInput(Vector3 dir, bool run)
+        {
+            _dDir = dir;
+            _dRun = run;
+        }
+
+        /// <summary>Its mover says it attacks now, facing yaw (Remote, Viewer), or the steering player clicked (Driver).
+        /// False when it can't attack right now (already attacking or gone).</summary>
+        internal bool AttackNow(float yaw)
+        {
+            if (_phase == Phase.Vanish || _phase == Phase.Attack) return false;
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            _rYaw = yaw;
+            _lastRemoteAt = Time.time;
+            StartAttack(Time.time);
+            return true;
+        }
+
+        /// <summary>Changes who moves it (the dead player let go or dropped out: Ai on the target, Viewer on the dead
+        /// player's game; or a viewer finds out it steers it).</summary>
+        internal void SetMode(Mode mode)
+        {
+            if (_mode == mode) return;
+            _mode = mode;
+            _rPos = transform.position;
+            _rYaw = transform.eulerAngles.y;
+            _rHas = true;
+            _lastRemoteAt = Time.time;
+            _dDir = Vector3.zero;
+            if (mode == Mode.Ai && _phase != Phase.Attack && _phase != Phase.Vanish)
+            {
+                _phase = Phase.Charge; // it already knows where the player is: straight at them
+                _phaseAt = Time.time;
+                _path.Clear();
+                _pathIdx = 0;
+                _routeFails = 0;
+                _nextRouteAt = 0f;
+            }
+        }
+
+        /// <summary>Viewer/Driver: the target's game says it's over (its Gone message).</summary>
+        internal void EndShown(Outcome outcome)
+        {
+            if (_phase == Phase.Vanish) return;
+            // Its attack's own vanish already ran on this game when the attack played here.
+            Vanish(outcome, quiet: outcome == Outcome.Cancelled);
         }
 
         void Face(Vector3 flatDir, float dt)
@@ -671,18 +889,28 @@ namespace Hallucinations
             _playedItemSfx.Clear();
             if (_spec.Skill != 0) Puppet.UseSkill(_spec.Skill);
             Log.Trace($"Hallucination #{Id}: attacks ({_spec.Name})");
+            if (_mode == Mode.Ai)
+            {
+                // On its own: the dead players who see it are told (the host forwards it).
+                try { _onAttack?.Invoke(this); }
+                catch (Exception e) { Log.ErrorOnce("fake-attack-cb", "Reporting the attack failed: " + e); }
+            }
         }
+
+        bool TargetSide => _mode == Mode.Ai || _mode == Mode.Remote;
 
         void AttackUpdate(float dt, Vector3 me, Vector3 eye, float dist)
         {
             _attackT += dt;
             if (!_hit && !_exploded)
             {
-                if (_spec.MoveDuring && dist > 1.1f && HasLine(eye, me)) MoveTowards(me, WalkSpeed, dt);
+                // Only on its own does it keep closing in and turning to the player while it swings; steered, it strikes
+                // where its dead player aimed it.
+                if (_mode == Mode.Ai && _spec.MoveDuring && dist > 1.1f && HasLine(eye, me)) MoveTowards(me, WalkSpeed, dt);
                 else
                 {
                     StandStill();
-                    FaceTowards(me, dt);
+                    if (_mode == Mode.Ai) FaceTowards(me, dt);
                 }
             }
 
@@ -708,8 +936,11 @@ namespace Hallucinations
             _hit = true;
             if (_spec.Melee) PlayItemSfx("swing"); // the clip's own swing comes a moment after the hit frame: play it now
             if (_weapon == Weapon.Shotgun) PlayShotgunSfx(); // a slow frame can reach the hit before the 0.03 s mark
-            bool landed = InReach(transform.position, _spec.LandReach, _spec.HalfAngle);
+            // Only the target's game knows where the player really is: it decides, and reports it. Elsewhere the attack
+            // just plays and it's gone.
+            bool landed = TargetSide && InReach(transform.position, _spec.LandReach, _spec.HalfAngle);
             if (landed) HitAvatar(_spec.Effect);
+            _attackEnded = true;
             Vanish(landed ? Outcome.Landed : Outcome.Missed);
         }
 
@@ -723,8 +954,9 @@ namespace Hallucinations
             Vector3 at = _weaponGo != null ? _weaponGo.transform.position : Chest;
             _explosionFxShown = SpawnExplosion(at);
             HideAll();
-            bool landed = InReach(at, _spec.LandReach, 180f);
+            bool landed = TargetSide && InReach(at, _spec.LandReach, 180f);
             if (landed) HitAvatar(_spec.Effect);
+            _attackEnded = true;
             Vanish(landed ? Outcome.Landed : Outcome.Missed, noDespawnEffect: true);
         }
 
@@ -879,9 +1111,10 @@ namespace Hallucinations
             _vanishAt = Time.time;
             _quiet = quiet;
             _noDespawnEffect = noDespawnEffect;
-            // Its attack landed: it's gone the moment it hits, not dissolving through the rest of the swing.
-            if (outcome == Outcome.Landed) _hideAt = LandedHideAt;
-            try { Victim.OnFakeEnded(this, outcome); }
+            // Its attack landed: it's gone the moment it hits, not dissolving through the rest of the swing. On a dead
+            // player's game its attack is its end too (the target's game decides the rest).
+            if (outcome == Outcome.Landed || (_attackEnded && !TargetSide)) _hideAt = LandedHideAt;
+            try { _onEnded?.Invoke(this, outcome); }
             catch (Exception e) { Log.ErrorOnce("fake-ended", "Reporting a hallucination's end failed: " + e); }
             StopBeep();
             if (quiet)

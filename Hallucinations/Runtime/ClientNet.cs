@@ -143,6 +143,8 @@ namespace Hallucinations
             catch (Exception e) { Log.ErrorOnce("leave-spectator", "Resetting the spectator side failed: " + e); }
             try { Victim.Reset(cancelled: true); }
             catch (Exception e) { Log.ErrorOnce("leave-victim", "Resetting the hallucination failed: " + e); }
+            try { Spectate.Reset(); }
+            catch (Exception e) { Log.ErrorOnce("leave-spectate", "Resetting the shown hallucinations failed: " + e); }
             if (had) Log.Trace("Level left: " + why);
         }
 
@@ -180,6 +182,23 @@ namespace Hallucinations
                 case Sop.Outcome:
                     if (me != 0 && m.Target == me) DebugKeys.OnOutcome(m);
                     else SpectatorInput.OnOutcome(m);
+                    break;
+                // Hallucinations shown to dead players, and steering (Spectate); a pose, attack or release for the
+                // target's own hallucination goes to Victim.
+                case Sop.Show:
+                    Spectate.OnShow(m);
+                    break;
+                case Sop.Drive:
+                    if (!Victim.OnDrive(m)) Spectate.OnDrive(m);
+                    break;
+                case Sop.Attack:
+                    if (!Victim.OnAttack(m)) Spectate.OnAttack(m);
+                    break;
+                case Sop.Gone:
+                    Spectate.OnGone(m);
+                    break;
+                case Sop.Release:
+                    if (!Victim.OnRelease(m)) Spectate.OnRelease(m);
                     break;
                 default:
                     Log.Trace("Unknown message from the host: op " + (int)m.Op);
@@ -256,6 +275,8 @@ namespace Hallucinations
             catch (Exception e) { Log.ErrorOnce("tick-spectator", "Spectator update failed: " + e); }
             try { Victim.Tick(); }
             catch (Exception e) { Log.ErrorOnce("tick-victim", "Hallucination update failed: " + e); }
+            try { Spectate.Tick(); }
+            catch (Exception e) { Log.ErrorOnce("tick-spectate", "Steering/showing hallucinations failed: " + e); }
             try { DebugKeys.Tick(); }
             catch (Exception e) { Log.ErrorOnce("tick-debug", "Debug keys failed: " + e); }
         }

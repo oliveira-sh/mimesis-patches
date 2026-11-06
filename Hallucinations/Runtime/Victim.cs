@@ -50,6 +50,7 @@ namespace Hallucinations
                 _checks.Clear();
                 return;
             }
+            SendPose();
             if (_checks.Count == 0) return;
             float now = Time.time;
             for (int i = _checks.Count - 1; i >= 0; i--)
@@ -120,7 +121,11 @@ namespace Hallucinations
                 return;
             }
 
-            var fake = FakeMimic.Create(scene, m, pos, yaw, navOk);
+            // Steered by the dead player who sent it (m.Ctl), or on its own (a debug self-spawn).
+            var mode = m.Ctl != 0 ? FakeMimic.Mode.Remote : FakeMimic.Mode.Ai;
+            var fake = FakeMimic.Create(scene, m.Id, m.Weapon, m.Seed, m.TtlMs, pos, yaw, navOk, mode, OnFakeEnded,
+                onAttack: f => ClientNet.Send(Protocol.Attack(f.Id, f.transform.eulerAngles.y)),
+                onTakeOver: f => ClientNet.Send(Protocol.Release(f.Id)));
             if (fake == null)
             {
                 End(m.Id, Outcome.Error);
@@ -129,8 +134,67 @@ namespace Hallucinations
             _active = fake;
             _activeId = m.Id;
             _checks.Clear();
+            _seq = 0;
+            _nextPoseAt = 0f;
+            // Where it appeared: the host shows it to the dead players from here (and its dead player steers it from here).
+            ClientNet.Send(Protocol.Placed(m.Id, pos, yaw));
             float dist = Vector3.Distance(pos, avatar.transform.position);
-            Log.Info($"Hallucination #{m.Id} ({fake.Description}{(m.Debug ? ", debug" : "")}) appears {dist:0.0} m away ({where})");
+            Log.Info($"Hallucination #{m.Id} ({fake.Description}{(m.Debug ? ", debug" : "")}{(m.Ctl != 0 ? $", steered by {Name(m.Ctl)}" : "")}) appears {dist:0.0} m away ({where})");
+        }
+
+        static int _seq;
+        static float _nextPoseAt;
+
+        /// <summary>While it runs on its own (Ai), this game moves it: its poses go to the host for the dead players who
+        /// see it.</summary>
+        static void SendPose()
+        {
+            if (_active == null || _active.IsVanishing || _active.CurrentMode != FakeMimic.Mode.Ai) return;
+            float now = Time.unscaledTime;
+            if (now < _nextPoseAt) return;
+            var pose = _active.CurrentPose;
+            _nextPoseAt = now + (pose.Move == MoveKind.Idle ? Const.IdleSendInterval : Const.MoveSendInterval);
+            ClientNet.Send(Protocol.Drive(_activeId, pose, ++_seq));
+        }
+
+        /// <summary>The host forwards a pose from the dead player who steers our hallucination.</summary>
+        internal static bool OnDrive(in HostMsg m)
+        {
+            if (_active == null || m.Id != _activeId) return false;
+            if (_active.CurrentMode == FakeMimic.Mode.Remote) _active.ApplyRemote(m.Pose);
+            return true;
+        }
+
+        /// <summary>The dead player who steers it attacks: it plays here, and this game decides whether it lands.</summary>
+        internal static bool OnAttack(in HostMsg m)
+        {
+            if (_active == null || m.Id != _activeId) return false;
+            if (_active.CurrentMode == FakeMimic.Mode.Remote) _active.AttackNow(m.Pose.Yaw);
+            return true;
+        }
+
+        /// <summary>The dead player let go (or left): it runs on its own from now.</summary>
+        internal static bool OnRelease(in HostMsg m)
+        {
+            if (_active == null || m.Id != _activeId) return false;
+            if (_active.CurrentMode == FakeMimic.Mode.Remote)
+            {
+                _active.SetMode(FakeMimic.Mode.Ai);
+                Log.Info($"Hallucination #{m.Id}: its dead player let go; it goes on its own");
+            }
+            return true;
+        }
+
+        static string Name(int actorId)
+        {
+            try
+            {
+                var main = Hub.Main;
+                var a = main != null ? main.GetActorByActorID(actorId) : null;
+                if (a != null) return a.nickName;
+            }
+            catch (Exception) { /* name only */ }
+            return "#" + actorId;
         }
 
         /// <summary>FakeMimic calls this exactly once when it ends (any reason).</summary>

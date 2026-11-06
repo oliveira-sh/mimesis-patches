@@ -28,7 +28,9 @@ jobs:
         shell: pwsh
         run: |
           [xml]$p = Get-Content Installer/Installer.csproj
-          $v = ($p.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          # @(...) so [0] is the first Version, not the first character of a single string.
+          $v = @($p.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected installer version '$v'" }
           "version=$v" >> $env:GITHUB_OUTPUT
 
       - name: Publish

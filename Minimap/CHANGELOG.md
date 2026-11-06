@@ -1,6 +1,7 @@
 # Minimap changelog
 
-## Unreleased
+## 1.7.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)
 - Patches window on Linux (Proton): Update shows the linux/mimesis-patches.py command to run, with a Copy button, instead of starting the Windows installer
 

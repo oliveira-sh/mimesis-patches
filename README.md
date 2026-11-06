@@ -51,17 +51,17 @@ In game, the Patches window still shows when an update is available. Under Proto
 
 | Patch | Version | Host | Player | What it does |
 |---|---|---|---|---|
-| [BiggerLobby](BiggerLobby/) | 1.5.7 | Yes | For the 10-player UI | 10-player lobbies, with UI for 10 and difficulty that scales with player count |
-| [PSController](PSController/) | 1.5.4 | Optional | Optional | PlayStation button icons instead of Xbox ones |
-| [SpectatorCam](SpectatorCam/) | 1.3.3 | Optional | Optional | Free spectator camera, limited to the area around the player you're watching |
-| [Minimap](Minimap/) | 1.6.5 | Optional | Optional | Minimap: explored or full map, plain or graphic, optional players/monsters/items |
-| [HostOptions](HostOptions/) | 1.4.4 | Yes | No | Lobby options: infinite stamina, starting money, difficulty and economy |
-| [Inventory](Inventory/) | 1.4.4 | Yes | Yes | 1-8 inventory slots, set by the host (slots 5-8 are the game's bag slots) |
-| [LateJoin](LateJoin/) | 1.2.3 | Yes | Yes | Join a game in progress: reach the tram while the team is away and you wait there for them, instead of going back to the menu |
-| [Fov](Fov/) | 1.5.4 | Optional | Optional | Field of view setting; [ and ] change it in game |
-| [Revive](Revive/) | 1.2.3 | Yes | No | Stand next to a dead teammate to revive them |
-| [HudPercent](HudPercent/) | 1.3.4 | Optional | Optional | Health and radiation percentages next to the HUD bars |
-| [FpsCounter](FpsCounter/) | 1.1.4 | Optional | Optional | Frame rate in the bottom-right corner |
+| [BiggerLobby](BiggerLobby/) | 1.6.0 | Yes | For the 10-player UI | 10-player lobbies, with UI for 10 and difficulty that scales with player count |
+| [PSController](PSController/) | 1.6.0 | Optional | Optional | PlayStation button icons instead of Xbox ones |
+| [SpectatorCam](SpectatorCam/) | 1.4.0 | Optional | Optional | Free spectator camera, limited to the area around the player you're watching |
+| [Minimap](Minimap/) | 1.7.0 | Optional | Optional | Minimap: explored or full map, plain or graphic, optional players/monsters/items |
+| [HostOptions](HostOptions/) | 1.5.0 | Yes | No | Lobby options: infinite stamina, starting money, difficulty and economy |
+| [Inventory](Inventory/) | 1.5.0 | Yes | Yes | 1-8 inventory slots, set by the host (slots 5-8 are the game's bag slots) |
+| [LateJoin](LateJoin/) | 1.3.0 | Yes | Yes | Join a game in progress: reach the tram while the team is away and you wait there for them, instead of going back to the menu |
+| [Fov](Fov/) | 1.6.0 | Optional | Optional | Field of view setting; [ and ] change it in game |
+| [Revive](Revive/) | 1.3.0 | Yes | No | Stand next to a dead teammate to revive them |
+| [HudPercent](HudPercent/) | 1.4.0 | Optional | Optional | Health and radiation percentages next to the HUD bars |
+| [FpsCounter](FpsCounter/) | 1.2.0 | Optional | Optional | Frame rate in the bottom-right corner |
 | [Hallucinations](Hallucinations/) | 1.0.0 | Yes | Yes | Above 50% radiation you may see fake mimics, sent by dead teammates (E while spectating); a dead player talking through a possessed mimic raises the radiation of players nearby |
 
 **Host / Player**: who needs the patch. *Yes* = required, *No* = not needed, *Optional* = personal feature, install it if you want it.

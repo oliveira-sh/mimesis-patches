@@ -2,7 +2,7 @@
 
 <p align="center"><img src="icon.png" width="160"></p>
 
-**Version 1.4.4**
+**Version 1.5.0**
 
 The host sets the inventory size to **1-8 slots**. Slots 5-8 are the game's own **bag slots** (the row a bag opens); bags still add slots on top, up to 8 in all. Fewer than 4 leaves the rest locked and hidden.
 

@@ -1,6 +1,7 @@
 # HostOptions changelog
 
-## Unreleased
+## 1.5.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Game update EA 0.4.0: the lobby's Infinite Stamina and Starting money controls moved, with the game's public match and password settings, from the Esc menu to the host's TRAM Settings window (F1)
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)
 - Patches window on Linux (Proton): Update shows the linux/mimesis-patches.py command to run, with a Copy button, instead of starting the Windows installer

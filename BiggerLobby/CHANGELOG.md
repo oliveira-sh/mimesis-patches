@@ -1,6 +1,7 @@
 # BiggerLobby changelog
 
-## Unreleased
+## 1.6.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Updated for MIMESIS EA 0.4.0, whose new pause menu, result screens and spectator list had broken the patch
 - Pause/lobby menu: works with the game's new menu, with a row for every player (up to 10): volume, mute, profile, kick and ping. Like the game's own list, it only lists joined players (no "Empty slot" rows)
 - Result screens: end of level, death match and the new session report show every player, in rows of up to 5

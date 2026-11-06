@@ -1,6 +1,7 @@
 # Revive changelog
 
-## Unreleased
+## 1.3.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - No revives once the level is decided (result screen and after), so a death already reported can't be undone
 - Game EA 0.4.0: players who join mid-level spectate until it ends, as the game intends; standing near the start point no longer revives them
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)

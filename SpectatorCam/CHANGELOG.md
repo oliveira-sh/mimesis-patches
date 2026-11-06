@@ -1,6 +1,7 @@
 # SpectatorCam changelog
 
-## Unreleased
+## 1.4.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Free camera: its keys (E = up) no longer possess a mimic or end the possession by accident; press F to return to the normal camera first. The controller is unaffected
 - Free camera: ignores input while the F9 feedback form is open, like the game's spectator camera
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)

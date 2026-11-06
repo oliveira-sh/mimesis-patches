@@ -2,7 +2,7 @@
 
 <p align="center"><img src="icon.png" width="160"></p>
 
-**Version 1.5.4**
+**Version 1.6.0**
 
 Adds a **field of view** setting for your first-person view.
 

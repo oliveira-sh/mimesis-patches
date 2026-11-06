@@ -2,7 +2,7 @@
 
 <p align="center"><img src="icon.png" width="160"></p>
 
-**Version 1.2.3**
+**Version 1.3.0**
 
 **Revive a dead teammate** during a level: stand next to their body for a few seconds and they come back with low health.
 

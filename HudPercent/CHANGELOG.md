@@ -1,6 +1,7 @@
 # HudPercent changelog
 
-## Unreleased
+## 1.4.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Works with the EA 0.4 HUD (new health graph and radiation gauge): the percentages sit right of each gauge, in the HUD's pixel font and amber color
 - Health shows 0% while you are dead (was 100%)
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)

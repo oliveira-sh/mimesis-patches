@@ -1,6 +1,7 @@
 # PSController changelog
 
-## Unreleased
+## 1.6.0
+- Updated for MIMESIS EA 0.4.1, Linux (Proton) support; installs and updates from oliveira-sh/mimesis-patches
 - Current game: controller prompts (crosshair, HUD and spectator tips, mimic possession, Controls settings) now come from a new key icon that the patch didn't reach; it shows the PlayStation icons too
 - A patch that no longer fits the game is logged instead of breaking the game's startup
 - Patches chip: shows on the EA 0.4.0 main menu again (the game renamed and hid the version text it looked for)

@@ -2,7 +2,7 @@
 
 <p align="center"><img src="icon.png" width="160"></p>
 
-**Version 1.2.3**
+**Version 1.3.0**
 
 Lets friends **join a game that's already running**. Since EA 0.4.0 the game does this itself (in a level you spectate until it ends); LateJoin covers a joiner who reaches the tram while the team is away: you wait on a message and join at the tram when they return, instead of being sent back to the menu.
 

@@ -1,6 +1,7 @@
 # Hallucinations changelog
 
-## Unreleased
+## 1.2.0
+- Steered hallucinations: fixes for walking, striking and vanishing; fake players as test targets; none during a deathmatch
 - Steered attacks land: on the target's game a steered hallucination now strikes from where its dead player attacked (not from where the network delay had left it) and turns to the player when they're in reach (the steering camera looks at the hallucination, not at the player).
 - Steering no longer gets stuck: a hallucination that appeared where the game's physics finds no floor under it (on some floors, slopes and stairs; about one in three in a test session) couldn't take a single step. It now walks on the navmesh where physics misses the floor, and one that's stuck where there's no floor at all is moved onto the nearest floor. If it still can't go somewhere, the log says what blocked it.
 - A steered hallucination no longer vanishes when it touches the player: its dead player walks it up to them to strike. (One running on its own still does.)

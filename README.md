@@ -62,7 +62,7 @@ In game, the Patches window still shows when an update is available. Under Proto
 | [Revive](Revive/) | 1.3.0 | Yes | No | Stand next to a dead teammate to revive them |
 | [HudPercent](HudPercent/) | 1.4.0 | Optional | Optional | Health and radiation percentages next to the HUD bars |
 | [FpsCounter](FpsCounter/) | 1.2.0 | Optional | Optional | Frame rate in the bottom-right corner |
-| [Hallucinations](Hallucinations/) | 1.1.0 | Yes | Yes | Above 50% radiation you may see fake mimics, sent by dead teammates (E while spectating); a dead player talking through a possessed mimic raises the radiation of players nearby |
+| [Hallucinations](Hallucinations/) | 1.2.0 | Yes | Yes | Above 50% radiation you may see fake mimics, sent by dead teammates (E while spectating); a dead player talking through a possessed mimic raises the radiation of players nearby |
 | [BetterMicrophone](BetterMicrophone/) | 1.0.0 | Optional | Optional | Cleaner voice: the game's neural noise remover turned on, hum and rumble filters, silence between words, even volume, higher voice quality; mic test |
 | [FakePlayers](FakePlayers/) | 1.0.0 | Optional | No | Testing tool, off by default: F7 adds fake players to your game and sets their health, radiation, alive/dead and position |
 | [BetterMimics](BetterMimics/) | 1.0.0 | Optional | No | Mimics act like the people they copy: one voice each, turn-taking and reply-like answers, they look at whoever talks, pick up scrap, join your dances, walk instead of flip-flopping into a run |

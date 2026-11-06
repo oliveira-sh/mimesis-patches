@@ -1,4 +1,5 @@
 # Deathmatch changelog
 
-## Unreleased
+## 1.0.0
 - First version (host and every player): the tram can offer a deathmatch destination (marked on its screen; Off / Rare / Often / Always). There everyone arrives alone somewhere inside the building (not in the tram), no monsters spawn but mimics, everyone is lent the double-barrel shotgun with both barrels loaded (taken back when the level ends, wherever it is), every death pays the team a share of the stage's repair cost (once per player per level), and the dead lose everything they carried (what's in the tram is safe). Someone joining mid-level spectates, as in any level: no shotgun, no gold. Needs 2 players, all with the patch in a version that can play with the host's (each player's game tells the host, with the version of its messages; without it or with another one, no deathmatch destinations, and the host is told who; someone without it joining the tram later makes the lever go to a normal level).
+

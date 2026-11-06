@@ -322,6 +322,7 @@ namespace Hallucinations
         public Pose Pose;
         public int Seq;                // Drive
         public int Ctl;                // Spawn, Show: actor id of the dead player who steers it (0 = it runs on its own)
+        public int Proxy;              // Spawn: it's for this fake player (FakePlayers), whose side this game plays (0 = yours)
     }
 
     /// <summary>Builds and reads every packet of the protocol. HostLogic and the client side only go through here, so the
@@ -448,8 +449,10 @@ namespace Hallucinations
             return S2C(receiverId, sb);
         }
 
-        /// <summary>ctlActorId: the dead player who will steer it (0 = it runs on its own from the start).</summary>
-        public static DebugInfoSig Spawn(int receiverId, int id, Weapon weapon, int seed, int ttlMs, int fromActorId, bool debug, int ctlActorId)
+        /// <summary>ctlActorId: the dead player who will steer it (0 = it runs on its own from the start). proxyActorId: the
+        /// target is this fake player and the receiver (the host) plays its side; 0 = the receiver is the target.</summary>
+        public static DebugInfoSig Spawn(int receiverId, int id, Weapon weapon, int seed, int ttlMs, int fromActorId, bool debug, int ctlActorId,
+            int proxyActorId = 0)
         {
             var sb = S2CBegin(Sop.Spawn);
             Add(sb, "id", id);
@@ -459,6 +462,7 @@ namespace Hallucinations
             Add(sb, "from", fromActorId);
             Add(sb, "dbg", debug ? 1 : 0);
             Add(sb, "ctl", ctlActorId);
+            if (proxyActorId != 0) Add(sb, "px", proxyActorId);
             return S2C(receiverId, sb);
         }
 
@@ -589,6 +593,7 @@ namespace Hallucinations
                     case "left": m.CooldownLeftMs = n; break;
                     case "o": m.Outcome = (Outcome)n; break;
                     case "ctl": m.Ctl = n; break;
+                    case "px": m.Proxy = n; break;
                     case "s": m.Seq = n; break;
                     case "x": px = n; break;
                     case "y": py = n; break;

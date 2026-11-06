@@ -11,6 +11,10 @@
 // The host never trusts the client: every rule is checked here, whatever the client's tip said. It never spawns
 // anything, never changes a stat except the debug radiation key (talk radiation is TalkRadiation.cs), never touches
 // possession, and only ever sends to players whose game spoke this protocol to it.
+// Fake players (the game's dummy players: FakePlayers, or its "spawndummyplayer" admin command) have no game. With
+// Debug keys on, the host's own game plays their side (Proxy.cs): a slot's Game is whoever's game places it, runs it
+// and decides its hits (the target itself, or the host for a fake player), and everything "to/from the target's game"
+// goes to/comes from Game.
 
 using System;
 using System.Collections.Generic;
@@ -48,6 +52,8 @@ namespace Hallucinations
 
             /// <summary>The living player who sees it.</summary>
             public VPlayer Target;
+            /// <summary>The game that plays the target's side: the target's own, or the host's for a fake player.</summary>
+            public VPlayer Game;
             public int Seed;
             /// <summary>The dead player who steers it (the requester), until they let go or leave; null = nobody.</summary>
             public VPlayer Controller;
@@ -74,6 +80,7 @@ namespace Hallucinations
         static readonly Random _rng = new Random();
         static int _nextId;
         static bool _subscribed;
+        static VPlayer _leaving;    // OnRemovePlayer: the player leaving right now (still listed in its room)
 
         /// <summary>A game says hello once per level (re-sent every Const.HelloRetrySec until acked): hellos closer than
         /// this are dropped, so a modified client can't make the host re-ack the whole room on every packet.</summary>
@@ -158,6 +165,9 @@ namespace Hallucinations
             if (m.Version != Const.ProtocolVersion || !_clients.ContainsKey(p)) { Refuse(p, m, Result.BadRequest); return; }
             // The dungeon ended (success or failure): results screen and exit, every player protected (HarmBlocked).
             if (!(room is DungeonRoom) || room.IsSessionEnding) { Refuse(p, m, Result.NotInLevel); return; }
+            // A deathmatch runs here (the Deathmatch patch says so through AppDomain data): a fight between players stays
+            // fair, no fake attacker for the living to waste a shell on. The requester sees "Hallucinations are off".
+            if (ReferenceEquals(AppDomain.CurrentDomain.GetData("MimesisPatches.FairFightRoom"), room)) { Refuse(p, m, Result.Disabled); return; }
 
             bool self = m.Target == p.ObjectID;
             if (self && !Settings.Debug) { Refuse(p, m, Result.BadRequest); return; }
@@ -168,7 +178,8 @@ namespace Hallucinations
             var t = self ? p : room.FindPlayerByObjectID(m.Target);
             if (t == null || !t.IsAliveStatus()) { Refuse(p, m, Result.BadTarget); return; }
             if (t.HarmBlocked) { Refuse(p, m, Result.NotInLevel); return; }
-            if (!_clients.TryGetValue(t, out var c) || (c.Caps & Caps.Render) == 0) { Refuse(p, m, Result.NoMod); return; }
+            var game = GameFor(t);
+            if (game == null) { Refuse(p, m, Result.NoMod); return; }
 
             long conta = t.StatControlUnit?.GetCurrentConta() ?? 0L;
             if (!self && conta <= Settings.ThresholdConta) { Refuse(p, m, Result.LowRadiation); return; }   // "above": strictly
@@ -194,7 +205,8 @@ namespace Hallucinations
             // self-spawn runs on its own.
             var ctl = self ? null : p;
 
-            SendTo(t, Protocol.Spawn(t.ObjectID, id, weapon, seed, ttl, self ? 0 : p.ObjectID, self, ctl != null ? ctl.ObjectID : 0));
+            SendTo(game, Protocol.Spawn(game.ObjectID, id, weapon, seed, ttl, self ? 0 : p.ObjectID, self, ctl != null ? ctl.ObjectID : 0,
+                t.IsDummy ? t.ObjectID : 0));
             var slot = new Slot
             {
                 Id = id,
@@ -206,6 +218,7 @@ namespace Hallucinations
                 Debug = self,
                 CooldownUntil = cooldownUntil,
                 Target = t,
+                Game = game,
                 Seed = seed,
                 Controller = ctl,
                 Controlled = ctl != null,
@@ -214,7 +227,23 @@ namespace Hallucinations
             _byId[id] = slot;
             if (!self) _cooldown[p.SteamID] = cooldownUntil;
             SendTo(p, Protocol.Result(p.ObjectID, m.Nonce, Result.Ok, id, t.ObjectID, self ? 0 : ClampMs(Settings.CooldownMs)));
-            Log.Info($"Hallucination #{id}: {Name(p)} -> {Name(t)} ({weapon}, radiation {Pct(conta)}%{(self ? ", debug" : "")})");
+            Log.Info($"Hallucination #{id}: {Name(p)} -> {Name(t)} ({weapon}, radiation {Pct(conta)}%{(self ? ", debug" : "")}" +
+                     $"{(t.IsDummy ? ", a fake player: " + Name(game) + "'s game plays its side" : "")})");
+        }
+
+        /// <summary>Whose game plays t's side, or null when none can: t's own when it said hello showing hallucinations;
+        /// for a fake player, with Debug keys on, the host's (in t's level, showing hallucinations).</summary>
+        static VPlayer GameFor(VPlayer t)
+        {
+            if (t == null) return null;
+            if (!t.IsDummy) return _clients.TryGetValue(t, out var c) && (c.Caps & Caps.Render) != 0 ? t : null;
+            if (!Settings.Debug) return null;
+            foreach (var kv in _clients)
+            {
+                var h = kv.Key;
+                if (h.IsHost && (kv.Value.Caps & Caps.Render) != 0 && ReferenceEquals(h.VRoom, t.VRoom) && InRoom(h, t.VRoom)) return h;
+            }
+            return null;
         }
 
         static void Refuse(VPlayer p, in ClientMsg m, Result r, int cooldownLeftMs = 0)
@@ -230,9 +259,9 @@ namespace Hallucinations
         /// never really reached the player, and tell the requester.</summary>
         static void OnEnd(VPlayer p, in ClientMsg m)
         {
-            if (!_active.TryGetValue(p, out var a) || a.Id != m.Id)
+            if (!_byId.TryGetValue(m.Id, out var a) || !ReferenceEquals(a.Game, p))
             {
-                Log.Trace($"End of hallucination #{m.Id} from {Name(p)} ignored (not their active one)");
+                Log.Trace($"End of hallucination #{m.Id} from {Name(p)} ignored (not one their game runs)");
                 return;
             }
             var outcome = m.Outcome;
@@ -250,8 +279,8 @@ namespace Hallucinations
             // The requester hears how it ended (a debug self-spawn: the target itself, its debug keys log it).
             var to = a.Debug ? p : a.Requester;
             if (to != null && InRoom(to, p.VRoom))
-                SendTo(to, Protocol.OutcomeMsg(to.ObjectID, a.Id, outcome, p.ObjectID));
-            Log.Info($"Hallucination #{a.Id} on {Name(p)} ended: {outcome}" + (refunded ? " (cooldown refunded)" : ""));
+                SendTo(to, Protocol.OutcomeMsg(to.ObjectID, a.Id, outcome, a.Target.ObjectID));
+            Log.Info($"Hallucination #{a.Id} on {Name(a.Target)} ended: {outcome}" + (refunded ? " (cooldown refunded)" : ""));
         }
 
         // ========================================================================= dead players: show and steer
@@ -259,7 +288,7 @@ namespace Hallucinations
         /// <summary>The target placed its hallucination: from now the dead players see it, and its controller steers it.</summary>
         static void OnPlaced(VPlayer p, in ClientMsg m)
         {
-            if (!_byId.TryGetValue(m.Id, out var s) || !ReferenceEquals(s.Target, p) || s.Placed) return;
+            if (!_byId.TryGetValue(m.Id, out var s) || !ReferenceEquals(s.Game, p) || s.Placed) return;
             s.Placed = true;
             s.Pose = m.Pose;
             ShowToDead(s);
@@ -268,7 +297,9 @@ namespace Hallucinations
         }
 
         /// <summary>A pose from whoever moves it (the controller while it steers, else the target's game). Forwarded to the
-        /// target (when the controller moves it) and to every dead player shown it, except the sender.</summary>
+        /// target's game (when the controller moves it) and to every dead player shown it, except the controller's own.
+        /// For a fake player the host's game can be all three: its target's game, a dead player shown it and the
+        /// controller, with a separate copy for each role, so only the steering copy is skipped.</summary>
         static void OnDrive(VPlayer p, in ClientMsg m)
         {
             if (!_byId.TryGetValue(m.Id, out var s) || !s.Placed || !IsMover(s, p)) return;
@@ -276,40 +307,41 @@ namespace Hallucinations
             s.LastSeq = m.Seq;
             s.Pose = m.Pose;
             ShowToDead(s); // players who died since it appeared see it from now
-            if (!ReferenceEquals(p, s.Target)) SendTo(s.Target, Protocol.DriveS(s.Target.ObjectID, s.Id, s.Pose, m.Seq));
+            if (s.Controlled) SendTo(s.Game, Protocol.DriveS(s.Game.ObjectID, s.Id, s.Pose, m.Seq));
             foreach (var v in s.Shown)
-                if (!ReferenceEquals(v, p) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.DriveS(v.ObjectID, s.Id, s.Pose, m.Seq));
+                if (!(s.Controlled && ReferenceEquals(v, p)) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.DriveS(v.ObjectID, s.Id, s.Pose, m.Seq));
         }
 
         /// <summary>It attacks (whoever moves it says so): the target's game decides whether it lands; the others play it.</summary>
         static void OnAttack(VPlayer p, in ClientMsg m)
         {
             if (!_byId.TryGetValue(m.Id, out var s) || !s.Placed || !IsMover(s, p)) return;
-            if (!ReferenceEquals(p, s.Target)) SendTo(s.Target, Protocol.AttackS(s.Target.ObjectID, s.Id, m.Pose.Yaw));
+            if (s.Controlled) SendTo(s.Game, Protocol.AttackS(s.Game.ObjectID, s.Id, m.Pose.Yaw));
             foreach (var v in s.Shown)
-                if (!ReferenceEquals(v, p) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.AttackS(v.ObjectID, s.Id, m.Pose.Yaw));
-            Log.Trace($"Hallucination #{s.Id} attacks ({(ReferenceEquals(p, s.Target) ? "on its own" : "steered by " + Name(p))})");
+                if (!(s.Controlled && ReferenceEquals(v, p)) && InRoom(v, s.Target.VRoom)) SendTo(v, Protocol.AttackS(v.ObjectID, s.Id, m.Pose.Yaw));
+            Log.Trace($"Hallucination #{s.Id} attacks ({(s.Controlled ? "steered by " + Name(p) : "on its own")})");
         }
 
         /// <summary>The controller lets go, or the target's game took it over (no poses from the controller): it runs on
-        /// its own from now; the other side is told.</summary>
+        /// its own from now; the other side is told. (The host steering a fake player's hallucination is both: either way
+        /// its game hears Release and both of its copies sort it out.)</summary>
         static void OnRelease(VPlayer p, in ClientMsg m)
         {
             if (!_byId.TryGetValue(m.Id, out var s) || !s.Controlled) return;
             if (ReferenceEquals(p, s.Controller)) StopSteering(s, "let go", tellTarget: true, tellController: false);
-            else if (ReferenceEquals(p, s.Target)) StopSteering(s, "taken over by the target's game", tellTarget: false, tellController: true);
+            else if (ReferenceEquals(p, s.Game)) StopSteering(s, "taken over by the target's game", tellTarget: false, tellController: true);
         }
 
         /// <summary>p is who moves s right now.</summary>
         static bool IsMover(Slot s, VPlayer p) =>
-            s.Controlled ? ReferenceEquals(p, s.Controller) : ReferenceEquals(p, s.Target);
+            s.Controlled ? ReferenceEquals(p, s.Controller) : ReferenceEquals(p, s.Game);
 
         static void StopSteering(Slot s, string why, bool tellTarget, bool tellController)
         {
             if (!s.Controlled) return;
             s.Controlled = false;
             s.LastSeq = 0; // the target's game counts its own poses
-            if (tellTarget && InRoom(s.Target, s.Target.VRoom)) SendTo(s.Target, Protocol.ReleaseS(s.Target.ObjectID, s.Id));
+            if (tellTarget && InRoom(s.Game, s.Target.VRoom)) SendTo(s.Game, Protocol.ReleaseS(s.Game.ObjectID, s.Id));
             if (tellController && s.Controller != null && InRoom(s.Controller, s.Target.VRoom))
                 SendTo(s.Controller, Protocol.ReleaseS(s.Controller.ObjectID, s.Id));
             Log.Info($"Hallucination #{s.Id}: {Name(s.Controller)} no longer steers it ({why})");
@@ -413,8 +445,15 @@ namespace Hallucinations
         {
             var p = room?.FindPlayerByObjectID(actorId);
             if (p == null) return;
-            bool wasTarget = _clients.TryGetValue(p, out var info) && (info.Caps & Caps.Render) != 0;
+            bool wasTarget = (_clients.TryGetValue(p, out var info) && (info.Caps & Caps.Render) != 0) || p.IsDummy;
             bool known = _clients.Remove(p);
+            // The host leaving: the fake players' hallucinations its game ran go with it.
+            _scratch.Clear();
+            foreach (var s in _active.Values)
+                if (ReferenceEquals(s.Game, p) && !ReferenceEquals(s.Target, p)) _scratch.Add(s.Target);
+            foreach (var target in _scratch)
+                if (_active.TryGetValue(target, out var orphan)) Forget(orphan, Outcome.Cancelled);
+            _scratch.Clear();
             if (_active.TryGetValue(p, out var slot))
             {
                 Forget(slot, Outcome.Cancelled);
@@ -435,7 +474,13 @@ namespace Hallucinations
                 }
                 s.Shown.Remove(p);
             }
-            if (wasTarget) AckOthers(room, p);
+            if (wasTarget)
+            {
+                // Still in the room (a prefix): left out of the lists by hand.
+                _leaving = p;
+                try { AckOthers(room, p); }
+                finally { _leaving = null; }
+            }
             if (known) Log.Trace($"{Name(p)} left {room.GetType().Name}: forgotten");
         }
 
@@ -462,8 +507,8 @@ namespace Hallucinations
             finally { _scratch.Clear(); }
         }
 
-        /// <summary>The actor ids of the players in room whose hello said they show hallucinations. The returned list is
-        /// reused: Protocol.Ack reads it at once.</summary>
+        /// <summary>The actor ids of the players in room whose hello said they show hallucinations, and of the fake players
+        /// the host's game plays (Debug keys). The returned list is reused: Protocol.Ack reads it at once.</summary>
         static List<int> TargetsOf(IVroom room)
         {
             _targets.Clear();
@@ -471,7 +516,27 @@ namespace Hallucinations
             foreach (var kv in _clients)
                 if ((kv.Value.Caps & Caps.Render) != 0 && ReferenceEquals(kv.Key.VRoom, room) && InRoom(kv.Key, room))
                     _targets.Add(kv.Key.ObjectID);
+            if (Settings.Debug)
+            {
+                try
+                {
+                    room.IterateAllPlayer(v =>
+                    {
+                        if (v != null && v.IsDummy && !ReferenceEquals(v, _leaving) && GameFor(v) != null) _targets.Add(v.ObjectID);
+                    });
+                }
+                catch (Exception e) { Log.WarnOnce("fake-targets", "Listing the fake players failed: " + e.Message); }
+            }
             return _targets;
+        }
+
+        /// <summary>H5: a fake player joined room: the players there get a fresh target list (with Debug keys on, it can be
+        /// sent hallucinations).</summary>
+        internal static void OnAddPlayer(IVroom room, VPlayer p)
+        {
+            if (p == null || !p.IsDummy || !Settings.Debug || !(room is DungeonRoom) || _clients.Count == 0) return;
+            AckOthers(room, null);
+            Log.Trace($"Fake player {Name(p)} joined: target lists re-sent");
         }
 
         /// <summary>p is still the player with its id in room (it didn't leave; ids can be reused by a later VPlayer).</summary>

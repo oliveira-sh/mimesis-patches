@@ -11,6 +11,7 @@
 
 using System;
 using HarmonyLib;
+using ReluProtocol.Enum;
 
 namespace Hallucinations
 {
@@ -50,8 +51,8 @@ namespace Hallucinations
         }
     }
 
-    /// <summary>H3-H4: per-player and per-level cleanup. Not core: all host state is keyed by VPlayer objects, which a new
-    /// level replaces anyway; this just drops them on time.</summary>
+    /// <summary>H3-H5: per-player and per-level cleanup, and fake players joining. Not core: all host state is keyed by
+    /// VPlayer objects, which a new level replaces anyway; this just drops them on time.</summary>
     [HarmonyPatch]
     static class HostLifecyclePatch
     {
@@ -71,6 +72,16 @@ namespace Hallucinations
                 try { TalkRadiation.OnRemovePlayer(__instance, actorID); }
                 catch (Exception e) { Log.ErrorOnce("H3-talk", "BeforeRemovePlayer (talk): " + e); }
             }
+        }
+
+        // H5. A player joining a room. Only fake players matter (the others say hello): with Debug keys on they can be
+        // sent hallucinations, so the target lists change.
+        [HarmonyPostfix, HarmonyPatch(typeof(IVroom), nameof(IVroom.AddPlayer))]
+        static void AfterAddPlayer(IVroom __instance, VPlayer player, MsgErrorCode __result)
+        {
+            if (!Control.HostReady || __result != MsgErrorCode.Success || player == null || !player.IsDummy) return;
+            try { HostLogic.OnAddPlayer(__instance, player); }
+            catch (Exception e) { Log.ErrorOnce("H5", "AfterAddPlayer: " + e); }
         }
 
         // H4. A new level: players, mimics and hallucinations of the last one are gone (new VPlayer objects per room).

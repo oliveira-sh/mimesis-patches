@@ -57,10 +57,13 @@ Turn on **Debug keys** (Patches > Hallucinations > Testing), host a game and ent
 
 In someone else's game the keys only work if the host has Debug keys on too.
 
+**Steering, alone**: with [FakePlayers](../FakePlayers/) (and Debug keys on), fake players can be sent hallucinations too; your game plays their side (where it appears, whether its attack lands). Press F7, add a fake player, set its radiation above the threshold, kill yourself, watch it and press **E**.
+
 ## Limits
 - The game's own radiation hallucinations are still there: from 55% radiation it shows its own fake mimics now and then. Those are the game's, not sent by anyone.
 - A hallucination appears out of your sight and walks to you, so in a big open area it can take a while; if it can't find a way to you, it fades away and the dead player gets their cooldown back.
 - A hallucination ignores doors closing after it appeared: it fades away instead of walking through.
+- None during a [Deathmatch](../Deathmatch/): a fight between players stays fair (no fake attacker to waste a shell on). The dead player is told "Hallucinations are off".
 
 ## Uninstall
 Delete `HallucinationsRuntime.dll` from the game's `Mods` folder, or use the installer's **Uninstall selected**. Installed with Gale or r2modman? Remove or disable it there instead.

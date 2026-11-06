@@ -141,7 +141,7 @@ namespace Hallucinations
 
         /// <summary>Testing: Ctrl+Shift+H sends a hallucination to yourself while alive (any radiation, no cooldown),
         /// Ctrl+Shift+J adds 10 % radiation to yourself. The host's setting decides; your own decides whether your keys
-        /// send anything.</summary>
+        /// send anything. On the host it also lets fake players (dummy players) be targets, its game playing their side.</summary>
         public static bool Debug
         {
             get { EnsureLoaded(); return _debug; }

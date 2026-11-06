@@ -145,6 +145,8 @@ namespace Hallucinations
             catch (Exception e) { Log.ErrorOnce("leave-victim", "Resetting the hallucination failed: " + e); }
             try { Spectate.Reset(); }
             catch (Exception e) { Log.ErrorOnce("leave-spectate", "Resetting the shown hallucinations failed: " + e); }
+            try { Proxy.Reset(); }
+            catch (Exception e) { Log.ErrorOnce("leave-proxy", "Resetting the fake players' hallucinations failed: " + e); }
             if (had) Log.Trace("Level left: " + why);
         }
 
@@ -173,7 +175,9 @@ namespace Hallucinations
                     OnAck(m);
                     break;
                 case Sop.Spawn:
-                    Victim.OnSpawn(m);
+                    // For a fake player: the host's game plays its side (Proxy).
+                    if (m.Proxy != 0) Proxy.OnSpawn(m);
+                    else Victim.OnSpawn(m);
                     break;
                 case Sop.Result:
                     if (me != 0 && m.Target == me) DebugKeys.OnResult(m);
@@ -184,21 +188,22 @@ namespace Hallucinations
                     else SpectatorInput.OnOutcome(m);
                     break;
                 // Hallucinations shown to dead players, and steering (Spectate); a pose, attack or release for the
-                // target's own hallucination goes to Victim.
+                // target's own hallucination goes to Victim, for a fake player's to Proxy (the host's game can hold
+                // that one and its own dead player's copy of it at once: both get it).
                 case Sop.Show:
                     Spectate.OnShow(m);
                     break;
                 case Sop.Drive:
-                    if (!Victim.OnDrive(m)) Spectate.OnDrive(m);
+                    if (!Victim.OnDrive(m)) { Proxy.OnDrive(m); Spectate.OnDrive(m); }
                     break;
                 case Sop.Attack:
-                    if (!Victim.OnAttack(m)) Spectate.OnAttack(m);
+                    if (!Victim.OnAttack(m)) { Proxy.OnAttack(m); Spectate.OnAttack(m); }
                     break;
                 case Sop.Gone:
                     Spectate.OnGone(m);
                     break;
                 case Sop.Release:
-                    if (!Victim.OnRelease(m)) Spectate.OnRelease(m);
+                    if (!Victim.OnRelease(m)) { Proxy.OnRelease(m); Spectate.OnRelease(m); }
                     break;
                 default:
                     Log.Trace("Unknown message from the host: op " + (int)m.Op);
@@ -275,6 +280,8 @@ namespace Hallucinations
             catch (Exception e) { Log.ErrorOnce("tick-spectator", "Spectator update failed: " + e); }
             try { Victim.Tick(); }
             catch (Exception e) { Log.ErrorOnce("tick-victim", "Hallucination update failed: " + e); }
+            try { Proxy.Tick(); }
+            catch (Exception e) { Log.ErrorOnce("tick-proxy", "Fake players' hallucinations update failed: " + e); }
             try { Spectate.Tick(); }
             catch (Exception e) { Log.ErrorOnce("tick-spectate", "Steering/showing hallucinations failed: " + e); }
             try { DebugKeys.Tick(); }

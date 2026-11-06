@@ -10,7 +10,7 @@
 // checks and relays, the dead player sends, the living player sees.
 //   Shared.cs          constants, wire protocol, logging, runtime facts (the contract between the sides)
 //   Settings.cs        host settings, published in the Steam lobby data
-//   HostPatches.cs     host side: the game hooks (H1-H4)
+//   HostPatches.cs     host side: the game hooks (H1-H5)
 //   HostLogic.cs       host side: hello, request validation, relay, cooldowns, cleanup
 //   TalkRadiation.cs   host side: radiation from dead players talking through a possessed mimic
 //   ClientNet.cs       every player: the per-frame driver, the inbox, hello/ack
@@ -19,6 +19,7 @@
 //   FakeMimic.cs       the fake attacker itself (puppet, weapon, movement, attack, vanish), on the target's game and
 //                      on the dead players' games
 //   Spectate.cs        dead players: seeing the hallucinations, and steering the one you sent
+//   Proxy.cs           host: playing a fake player's side (testing with FakePlayers, Debug setting)
 //   Placement.cs       living player: where to put it (outside the view)
 //   DebugKeys.cs       testing keys (Debug setting)
 
@@ -125,7 +126,9 @@ namespace Hallucinations
                     PatchUi.OnOff(page, font, "Debug keys", () => Settings.Debug, v => Settings.Debug = v);
                     PatchUi.Label(page, font,
                         "Ctrl+Shift+H: a hallucination on yourself while alive (any radiation, no cooldown; each press uses the next weapon). " +
-                        "Ctrl+Shift+J: +10% radiation to yourself. The host needs Debug keys on too (playing alone, that's you).",
+                        "Ctrl+Shift+J: +10% radiation to yourself. The host needs Debug keys on too (playing alone, that's you).\n" +
+                        "When you host, fake players (FakePlayers patch) can be sent hallucinations too: your game plays their side. " +
+                        "Raise one's radiation, die, watch it and press E to steer a hallucination at it without a second player.",
                         16f, PatchUi.Dim);
 
                     PatchUi.Section(page, font, "Bug reports");

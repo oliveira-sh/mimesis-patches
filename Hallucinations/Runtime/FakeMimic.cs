@@ -74,6 +74,15 @@ namespace Hallucinations
         const float RemoteSlackSeconds = 3f;     // viewers/driver: it can't outlive its lifetime by more than this
         const float CamRootHeight = 1.55f;       // the steering player's orbit camera follows this point
 
+        // ---- steering (Driver) ----
+        const float KneeHeight = 0.5f;
+        const float FloorProbeUp = 1f;           // the floor is looked for from this far above its feet...
+        const float FloorProbeDown = 1.2f;       // ...down to this far below them
+        const float NavFloorReach = 0.4f;        // a navmesh point this close (flat) stands in for a floor physics misses
+        const float LostStepUp = 1.5f;           // with no floor under it at all, any floor this close up or down will do
+        const float UnstickAfter = 0.75f;        // s pushed without moving before it's moved onto the nearest navmesh
+        const float ProxyViewHalfAngle = 50f;    // a fake player "sees" this far either side of where it faces
+
         /// <summary>One way to attack: the real animation state and its hit frame (from the clip events).</summary>
         sealed class AttackSpec
         {
@@ -132,6 +141,11 @@ namespace Hallucinations
         float _lastRemoteAt;
         Vector3 _dDir;            // the steering player's input this frame (Driver)
         bool _dRun;
+        float _blockedFor;        // Driver: how long it has been pushed without moving
+        bool _blockedLogged;
+        // Its target is a fake player (FakePlayers' dummy): the host's game plays that player's side (hits, AI). Never seen
+        // or heard here: the dead players' copies (Spectate), the host's included, are what shows.
+        bool _proxy;
 
         // ---- state ----
         GameMainBase _main;
@@ -161,10 +175,11 @@ namespace Hallucinations
 
         /// <summary>Builds the fake at pos facing yaw and starts it. Null (and nothing left behind) when it can't be built.
         /// navOk false: the spot came from the physics fallback (no client navmesh), so it walks straight.
-        /// onEnded: called exactly once when it ends (any reason); onAttack: when it starts an attack on its own (Ai).</summary>
+        /// onEnded: called exactly once when it ends (any reason); onAttack: when it starts an attack on its own (Ai).
+        /// proxyTarget: a fake player whose side this game plays (Ai/Remote only): it goes after them, unseen here.</summary>
         internal static FakeMimic Create(GameMainBase main, int id, Weapon weapon, int seed, int ttlMs, Vector3 pos, float yaw,
             bool navOk, Mode mode, Action<FakeMimic, Outcome> onEnded, Action<FakeMimic> onAttack = null,
-            Action<FakeMimic> onTakeOver = null)
+            Action<FakeMimic> onTakeOver = null, ProtoActor proxyTarget = null)
         {
             var spawn = new HostMsg { Id = id, Weapon = weapon, Seed = seed, TtlMs = ttlMs };
             GameObject root = null;
@@ -183,8 +198,10 @@ namespace Hallucinations
                 root.SetActive(false);
                 var bg = main != null ? main.GetBGRoot() : null;
                 if (bg != null) root.transform.SetParent(bg, false); // destroyed with the level, whatever else happens
-                // The navmesh point can be a little above or below the real floor: stand on the floor (within 0.5 m).
-                Vector3 floor = PhysicsUtility.DropToFloor(pos, 0.5f, 1f);
+                // The navmesh point can be a little above or below the real floor: stand on the floor (within 0.5 m up,
+                // 1 m down; from 1 m up when it's that far under it).
+                Vector3 floor = PhysicsUtility.DropToFloor(pos, 0.5f, 1.5f);
+                if (floor == pos) floor = PhysicsUtility.DropToFloor(pos, 1f, 1.5f);
                 if (floor != pos) pos.y = floor.y;
                 root.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
 
@@ -213,7 +230,8 @@ namespace Hallucinations
                 fake.CamRoot = camRoot;
                 fake._anim = anim;
                 fake._main = main;
-                fake._avatar = main != null ? main.GetMyAvatar() : null;
+                fake._proxy = proxyTarget != null && (mode == Mode.Ai || mode == Mode.Remote);
+                fake._avatar = fake._proxy ? proxyTarget : main != null ? main.GetMyAvatar() : null;
                 fake._navOk = navOk;
                 fake._tint = puppetGo.GetComponent<PuppetContaAppearance>();
                 fake._mode = mode;
@@ -228,6 +246,7 @@ namespace Hallucinations
 
                 root.SetActive(true);
                 fake.Setup(spawn);
+                if (fake._proxy) fake.HideAll();
                 return fake;
             }
             catch (Exception e)
@@ -391,6 +410,7 @@ namespace Hallucinations
         void TryBeep(float now)
         {
             if (!_beepPending || now < _nextBeepAt) return;
+            if (_proxy) { _beepPending = false; return; }
             try
             {
                 if (_weaponGo == null) { _beepPending = false; return; }
@@ -503,12 +523,13 @@ namespace Hallucinations
                     }
                 }
 
-                var cam = Camera.main;
+                var cam = _proxy ? null : Camera.main;
                 Vector3 me = _avatar.transform.position;
                 Vector3 eye = cam != null ? cam.transform.position : me + Vector3.up * HeadHeight;
                 Vector3 pos = transform.position;
                 float dist = Placement.Flat(me - pos).magnitude;
-                if (_phase != Phase.Attack && dist < TouchDistance && Mathf.Abs(me.y - pos.y) < 1.5f)
+                // Walking into it ends it, but not while a dead player steers it: they walk it up to the player to strike.
+                if (_mode == Mode.Ai && _phase != Phase.Attack && dist < TouchDistance && Mathf.Abs(me.y - pos.y) < 1.5f)
                 {
                     Log.Trace($"Hallucination #{Id}: you walked into it");
                     Vanish(Outcome.HitByPlayer);
@@ -556,6 +577,13 @@ namespace Hallucinations
             var main = Hub.Main;
             if (main == null || !ReferenceEquals(main, _main) || !(main is GamePlayScene scene)) return "left the level";
             if (!scene.IsGameLogicRunning) return "the level ended"; // exit cutscene and results: same scene and avatar
+            if (_proxy)
+            {
+                // A fake player's: only that player matters (this game's own player may live, die or watch).
+                if (_avatar == null) return "its fake player left";
+                if (_avatar.dead) return "its fake player died";
+                return Control.IsReplay ? "replay" : null;
+            }
             var me = main.GetMyAvatar();
             if (me == null || !ReferenceEquals(me, _avatar)) return "your avatar changed";
             if (Control.IsReplay) return "replay";
@@ -738,7 +766,9 @@ namespace Hallucinations
         }
 
         /// <summary>Driver: one step of the steering player's input along the floor; walls and drops stop it (it slides
-        /// along a wall when only one axis is blocked).</summary>
+        /// along a wall when only one axis is blocked). Never stuck for good: where neither physics nor the navmesh finds a
+        /// floor under it (it appeared under or inside something), any floor near enough will do, and if it still can't
+        /// move it's put on the nearest navmesh point.</summary>
         void DriveStep(float dt)
         {
             Vector3 dir = Placement.Flat(_dDir);
@@ -751,37 +781,116 @@ namespace Hallucinations
             float speed = _dRun ? RunSpeed : WalkSpeed;
             Vector3 pos = transform.position;
             Vector3 step = dir * (speed * dt);
-            if (!TryStep(pos, step, out Vector3 next) &&
-                !TryStep(pos, new Vector3(step.x, 0f, 0f), out next) &&
-                !TryStep(pos, new Vector3(0f, 0f, step.z), out next))
+            bool lost = !FloorAt(pos, pos.y, MaxFloorStep, out _);
+            // Straight on; else along the wall it ran into (what's left of the step once the part into the wall is taken
+            // off, so it slides round corners and crates); else along either axis.
+            if (TryStep(pos, step, lost, out Vector3 next, out string why, out Vector3 wall) ||
+                (wall != Vector3.zero && TryStep(pos, Slide(step, wall), lost, out next, out _, out _)) ||
+                TryStep(pos, new Vector3(step.x, 0f, 0f), lost, out next, out _, out _) ||
+                TryStep(pos, new Vector3(0f, 0f, step.z), lost, out next, out _, out _))
             {
-                StandStill();
+                _blockedFor = 0f;
+                transform.position = next;
                 Face(dir, dt);
+                Puppet.Move(dir * speed, WalkSpeed, RunSpeed);
+                Puppet.UpdateMoveType(_dRun ? ActorMoveType.Run : ActorMoveType.Walk);
+                _curMove = _dRun ? MoveKind.Run : MoveKind.Walk;
                 return;
             }
-            transform.position = next;
+            StandStill();
             Face(dir, dt);
-            Puppet.Move(dir * speed, WalkSpeed, RunSpeed);
-            Puppet.UpdateMoveType(_dRun ? ActorMoveType.Run : ActorMoveType.Walk);
-            _curMove = _dRun ? MoveKind.Run : MoveKind.Walk;
+            _blockedFor += dt;
+            if (_blockedFor < UnstickAfter) return;
+            _blockedFor = 0f;
+            if (!_blockedLogged)
+            {
+                _blockedLogged = true;
+                Log.Info($"Hallucination #{Id}: can't go that way from {Fmt(pos)} ({why}{(lost ? "; no floor under it" : "")})");
+            }
+            if (lost) Unstick(pos);
         }
 
         /// <summary>A step is fine when nothing solid is in the way at knee and chest height and there's a floor within a
-        /// stair step of where it stands.</summary>
-        bool TryStep(Vector3 pos, Vector3 step, out Vector3 next)
+        /// stair step of where it stands (lost: within LostStepUp). why: what stopped it.</summary>
+        bool TryStep(Vector3 pos, Vector3 step, bool lost, out Vector3 next, out string why, out Vector3 wall)
         {
             next = pos;
+            why = null;
+            wall = Vector3.zero;
             float len = step.magnitude;
-            if (len < 0.0001f) return false;
-            Vector3 ahead = step / len * (len + 0.3f); // keep a body's width from walls
-            if (!PhysicsUtility.CheckBlockByWall(pos + Vector3.up * 0.5f, pos + Vector3.up * 0.5f + ahead)) return false;
-            if (!PhysicsUtility.CheckBlockByWall(pos + Vector3.up * ChestHeight, pos + Vector3.up * ChestHeight + ahead)) return false;
+            if (len < 0.0001f) { why = "no step"; return false; }
+            Vector3 dir = step / len;
+            float reach = len + 0.3f; // keep a body's width from walls
+            if (Blocked(pos + Vector3.up * KneeHeight, dir, reach, "knee", out why, out wall)) return false;
+            if (Blocked(pos + Vector3.up * ChestHeight, dir, reach, "chest", out why, out wall)) return false;
             Vector3 to = pos + step;
-            Vector3 floor = PhysicsUtility.DropToFloor(to, 0.6f, 1.6f);
-            if (floor == to || Mathf.Abs(floor.y - pos.y) > MaxFloorStep + len) return false; // a drop, or a wall step
-            next = new Vector3(to.x, floor.y, to.z);
+            if (!FloorAt(to, pos.y, (lost ? LostStepUp : MaxFloorStep) + len, out float y))
+            {
+                why = "no floor ahead (a drop, or a step too high)";
+                return false;
+            }
+            next = new Vector3(to.x, y, to.z);
             return true;
         }
+
+        static bool Blocked(Vector3 from, Vector3 dir, float dist, string what, out string why, out Vector3 wall)
+        {
+            why = null;
+            wall = Vector3.zero;
+            if (!Physics.Raycast(from, dir, out var hit, dist, Hub.DefaultOnlyLayerMask, QueryTriggerInteraction.Ignore)) return false;
+            var c = hit.collider;
+            why = $"{what} blocked by {(c != null ? c.name : "?")} (layer {(c != null ? LayerMask.LayerToName(c.gameObject.layer) : "?")}, {hit.distance:0.00} m)";
+            wall = Placement.Flat(hit.normal);
+            if (wall.sqrMagnitude > 0.0001f) wall.Normalize();
+            return true;
+        }
+
+        /// <summary>step without its part into the wall (wall: the wall's flat normal), kept at step's length so it
+        /// doesn't crawl along it.</summary>
+        static Vector3 Slide(Vector3 step, Vector3 wall)
+        {
+            Vector3 along = step - wall * Vector3.Dot(step, wall);
+            float len = along.magnitude;
+            return len < 0.0001f ? Vector3.zero : along / len * step.magnitude;
+        }
+
+        /// <summary>The floor at (at.x, at.z) within tolerance of refY: what physics hits from a little above, else the
+        /// client navmesh (built on every game) when its nearest point is right there.</summary>
+        static bool FloorAt(Vector3 at, float refY, float tolerance, out float y)
+        {
+            y = refY;
+            var from = new Vector3(at.x, refY + FloorProbeUp, at.z);
+            if (Physics.Raycast(from, Vector3.down, out var hit, FloorProbeUp + FloorProbeDown, Hub.DefaultOnlyLayerMask, QueryTriggerInteraction.Ignore) &&
+                Mathf.Abs(hit.point.y - refY) <= tolerance)
+            {
+                y = hit.point.y;
+                return true;
+            }
+            var nav = Hub.s != null ? Hub.s.navman : null;
+            if (nav == null) return false;
+            Vector3 n;
+            try { n = nav.GetNearestPointOnNavMesh(at, 1f); }
+            catch (Exception) { return false; }
+            if (!NavMeshConstants.IsValid(n) || Placement.Flat(n - at).magnitude > NavFloorReach || Mathf.Abs(n.y - refY) > tolerance + 0.3f) return false;
+            y = n.y;
+            return true;
+        }
+
+        /// <summary>No floor under it and it can't step anywhere: onto the nearest navmesh point (3 m at most).</summary>
+        void Unstick(Vector3 pos)
+        {
+            var nav = Hub.s != null ? Hub.s.navman : null;
+            if (nav == null) return;
+            Vector3 n;
+            try { n = nav.GetNearestPointOnNavMesh(pos, 3f); }
+            catch (Exception) { return; }
+            if (!NavMeshConstants.IsValid(n)) return;
+            if (FloorAt(n, n.y, MaxFloorStep, out float y)) n.y = y;
+            transform.position = n;
+            Log.Info($"Hallucination #{Id}: stuck where there's no floor; moved onto the floor {Vector3.Distance(pos, n):0.0} m away");
+        }
+
+        static string Fmt(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         /// <summary>Remote/Viewer: a new pose from its mover.</summary>
         internal void ApplyRemote(in Pose p)
@@ -806,8 +915,22 @@ namespace Hallucinations
         internal bool AttackNow(float yaw)
         {
             if (_phase == Phase.Vanish || _phase == Phase.Attack) return false;
+            if ((_mode == Mode.Remote || _mode == Mode.Viewer) && _rHas)
+            {
+                // Strike from where its mover struck (its last pose came just before the attack), not from where this
+                // game's smoothing had got to: the delay would otherwise leave it short of the player.
+                transform.position = _rPos;
+            }
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            _rYaw = yaw;
+            if (_mode == Mode.Remote && _avatar != null)
+            {
+                // Steered attacks aim at the player when they're in reach: the dead player aims with a third-person camera
+                // that looks at the hallucination, not at the player, and sees them a moment late.
+                Vector3 to = Placement.Flat(_avatar.transform.position - transform.position);
+                if (to.sqrMagnitude > 0.01f && to.magnitude <= _spec.LandReach + 1.5f)
+                    transform.rotation = Quaternion.LookRotation(to);
+            }
+            _rYaw = transform.eulerAngles.y;
             _lastRemoteAt = Time.time;
             StartAttack(Time.time);
             return true;
@@ -854,6 +977,14 @@ namespace Hallucinations
         /// <summary>The player can see it: in the camera's view and not behind a wall.</summary>
         bool Seen(Camera cam)
         {
+            if (_proxy && _avatar != null)
+            {
+                // A fake player has no camera: it sees ahead of where it faces, from its head.
+                Vector3 head = _avatar.transform.position + Vector3.up * HeadHeight;
+                Vector3 to = Placement.Flat(Chest - head);
+                if (to.sqrMagnitude < 0.01f || Vector3.Angle(Placement.Flat(_avatar.transform.forward), to) > ProxyViewHalfAngle) return false;
+                return Clear(head, Chest) || Clear(head, Head);
+            }
             if (cam == null) return false;
             Placement.FrustumPlanes(cam.projectionMatrix * cam.worldToCameraMatrix, _planes);
             if (!Placement.InFrustum(_planes, transform.position + Vector3.up * 0.95f, new Vector3(0.4f, 0.95f, 0.4f))) return false;
@@ -862,8 +993,19 @@ namespace Hallucinations
         }
 
         /// <summary>A clear line from its chest to the player (head or body).</summary>
-        bool HasLine(Vector3 eye, Vector3 me) =>
-            PhysicsUtility.CheckBlockByWall(Chest, eye) || PhysicsUtility.CheckBlockByWall(Chest, me + Vector3.up * 1f);
+        bool HasLine(Vector3 eye, Vector3 me) => Clear(Chest, eye) || Clear(Chest, me + Vector3.up * 1f);
+
+        /// <summary>Nothing solid between a and b but the player's own body: the points aimed at (head, body) are inside
+        /// it, and another player's avatar (a fake player's, on the host's game) has a capsule on the walls' layer.</summary>
+        bool Clear(Vector3 a, Vector3 b)
+        {
+            Vector3 d = b - a;
+            float len = d.magnitude;
+            if (len < 0.001f) return true;
+            if (!Physics.Raycast(a, d / len, out var hit, len, Hub.DefaultOnlyLayerMask, QueryTriggerInteraction.Ignore)) return true;
+            var actor = hit.collider != null ? hit.collider.GetComponentInParent<ProtoActor>() : null;
+            return actor != null && ReferenceEquals(actor, _avatar);
+        }
 
         void WindupUpdate(float now, float dt, Vector3 me, Vector3 eye, float dist)
         {
@@ -962,6 +1104,7 @@ namespace Hallucinations
 
         bool SpawnExplosion(Vector3 at)
         {
+            if (_proxy) return true; // nothing to see here: the fake player "saw" it
             try
             {
                 var fs = Hub.s.tableman.fieldSkills;
@@ -985,10 +1128,10 @@ namespace Hallucinations
             Vector3 to = Placement.Flat(me - from);
             if (to.magnitude > reach || Mathf.Abs(me.y - from.y) > 2.5f) return false;
             if (halfAngle < 180f && to.sqrMagnitude > 0.01f && Vector3.Angle(Placement.Flat(transform.forward), to) > halfAngle) return false;
-            var cam = Camera.main;
+            var cam = _proxy ? null : Camera.main;
             Vector3 eye = cam != null ? cam.transform.position : me + Vector3.up * HeadHeight;
             Vector3 origin = from + (from == transform.position ? Vector3.up * ChestHeight : Vector3.zero);
-            return PhysicsUtility.CheckBlockByWall(origin, eye) || PhysicsUtility.CheckBlockByWall(origin, me + Vector3.up * 1f);
+            return Clear(origin, eye) || Clear(origin, me + Vector3.up * 1f);
         }
 
         /// <summary>What a real hit looks and sounds like on this game (ProtoActor.ResolvePacket_HitTargetSig without the
@@ -996,7 +1139,7 @@ namespace Hallucinations
         /// no stat.</summary>
         void HitAvatar(int effectId)
         {
-            if (_avatar == null) return;
+            if (_avatar == null || _proxy) return; // a fake player's hit is in its head only
             try { _avatar.PlaySkillHitEffect(effectId, playAnimation: true); }
             catch (Exception e) { Log.WarnOnce("hit-effect", "The hallucination's hit effect failed: " + e.Message); }
             try { if (_avatar.puppet != null) _avatar.puppet.PlayHitFeedback(); }
@@ -1018,7 +1161,7 @@ namespace Hallucinations
         /// <summary>An item sound as the game's "itemsfx:key" clip event plays it for a real holder, once per attack.</summary>
         void PlayItemSfx(string key)
         {
-            if (_spec == null || _spec.Item == 0 || string.IsNullOrEmpty(key) || !_playedItemSfx.Add(key)) return;
+            if (_proxy || _spec == null || _spec.Item == 0 || string.IsNullOrEmpty(key) || !_playedItemSfx.Add(key)) return;
             try
             {
                 var tables = Hub.s.tableman;
@@ -1044,6 +1187,13 @@ namespace Hallucinations
         internal bool OnAnimationEvent(string statement)
         {
             if (string.IsNullOrEmpty(statement)) return true;
+            if (_proxy)
+            {
+                // Unseen and unheard: only the bomb's timing matters.
+                if (statement.StartsWith("sfx:Bomb_Explosion_Body", StringComparison.Ordinal) && _weapon == Weapon.Bomb &&
+                    _phase == Phase.Attack) Explode();
+                return false;
+            }
             if (statement.StartsWith("mat:", StringComparison.Ordinal))
             {
                 // The despawn clip's dissolve (vanilla does nothing without an actor).
@@ -1124,7 +1274,7 @@ namespace Hallucinations
             }
             try { Puppet.Stop(); }
             catch (Exception) { /* cosmetic */ }
-            if (!noDespawnEffect)
+            if (!noDespawnEffect && !_proxy)
             {
                 // The ghost mimic's despawn: the Lifetime layer's "Dead/Despawn (Illusion Mimic)" (ActorType 10 +
                 // IsDespawning) animates the dissolve, which needs the material keyword on; the particles and their sound.
@@ -1182,7 +1332,7 @@ namespace Hallucinations
         /// <summary>Radiation tints every actor for this player (vanilla symptom 5): ours too, or it would stand out.</summary>
         void ApplyTint()
         {
-            if (_tint == null || _avatar == null) return;
+            if (_tint == null || _avatar == null || _proxy) return;
             float pct = _avatar.ContaAppearancePercent;
             if (pct < 0f)
             {

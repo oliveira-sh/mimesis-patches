@@ -136,8 +136,9 @@ namespace Hallucinations
             _checks.Clear();
             _seq = 0;
             _nextPoseAt = 0f;
-            // Where it appeared: the host shows it to the dead players from here (and its dead player steers it from here).
-            ClientNet.Send(Protocol.Placed(m.Id, pos, yaw));
+            // Where it appeared (on the floor): the host shows it to the dead players from here (and its dead player steers
+            // it from here).
+            ClientNet.Send(Protocol.Placed(m.Id, fake.transform.position, yaw));
             float dist = Vector3.Distance(pos, avatar.transform.position);
             Log.Info($"Hallucination #{m.Id} ({fake.Description}{(m.Debug ? ", debug" : "")}{(m.Ctl != 0 ? $", steered by {Name(m.Ctl)}" : "")}) appears {dist:0.0} m away ({where})");
         }

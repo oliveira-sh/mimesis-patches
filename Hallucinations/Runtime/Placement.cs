@@ -39,26 +39,43 @@ namespace Hallucinations
 
         /// <summary>A walkable spot 6-12 m from the avatar (4 m last resort), on its floor and indoor/outdoor side, outside
         /// the camera's view or hidden behind walls, reachable without a closed door. False = nowhere (NoSpot).
-        /// navOk: the spot came from the navmesh (else the fallback: the fake must walk straight).</summary>
-        internal static bool TryFind(GameMainBase main, ProtoActor avatar, int seed, out Vector3 pos, out float yaw, out string where, out bool navOk)
+        /// navOk: the spot came from the navmesh (else the fallback: the fake must walk straight).
+        /// avatarView: the avatar is a fake player (no camera): its view is from its head, where it faces.</summary>
+        internal static bool TryFind(GameMainBase main, ProtoActor avatar, int seed, out Vector3 pos, out float yaw, out string where, out bool navOk,
+            bool avatarView = false)
         {
             pos = Vector3.zero;
             yaw = 0f;
             where = "";
             navOk = false;
-            var cam = Camera.main;
-            if (main == null || avatar == null || cam == null) return false;
+            var cam = avatarView ? null : Camera.main;
+            if (main == null || avatar == null || (cam == null && !avatarView)) return false;
             var rnd = new System.Random(seed);
             Vector3 p = avatar.transform.position;
             var scene = main as GamePlayScene;
             bool? indoor0 = IndoorAt(scene, p);
 
             // A slightly wider view than the camera's, so the fake isn't seen popping in at the edge of the screen.
-            float fov = Mathf.Clamp(cam.fieldOfView + 15f, 30f, 170f);
-            var proj = Matrix4x4.Perspective(fov, Mathf.Max(0.1f, cam.aspect), Mathf.Max(0.01f, cam.nearClipPlane), 60f);
-            FrustumPlanes(proj * cam.worldToCameraMatrix, _planes);
-            Vector3 eye = cam.transform.position;
-            Vector3 camFwd = Flat(cam.transform.forward);
+            Vector3 eye;
+            Vector3 camFwd;
+            if (cam != null)
+            {
+                float fov = Mathf.Clamp(cam.fieldOfView + 15f, 30f, 170f);
+                var proj = Matrix4x4.Perspective(fov, Mathf.Max(0.1f, cam.aspect), Mathf.Max(0.01f, cam.nearClipPlane), 60f);
+                FrustumPlanes(proj * cam.worldToCameraMatrix, _planes);
+                eye = cam.transform.position;
+                camFwd = Flat(cam.transform.forward);
+            }
+            else
+            {
+                // A player's usual view (the game's default FOV, 16:9), widened the same way. Unity's view space looks
+                // down -z: worldToCamera is the inverse of the eye's transform with z flipped.
+                var rot = Quaternion.Euler(0f, avatar.transform.eulerAngles.y, 0f);
+                eye = p + Vector3.up * 1.6f;
+                var worldToCamera = Matrix4x4.Scale(new Vector3(1f, 1f, -1f)) * Matrix4x4.TRS(eye, rot, Vector3.one).inverse;
+                FrustumPlanes(Matrix4x4.Perspective(75f + 15f, 16f / 9f, 0.1f, 60f) * worldToCamera, _planes);
+                camFwd = Flat(rot * Vector3.forward);
+            }
 
             var nav = Hub.s != null ? Hub.s.navman : null;
             navOk = nav != null && NavMeshConstants.IsValid(SafeNearest(nav, p, 2f));
